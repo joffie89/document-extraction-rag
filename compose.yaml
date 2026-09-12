@@ -1,0 +1,27 @@
+services:
+  app:
+    build:
+      context: .
+      target: ${DOCKER_TARGET:-final}
+    image: document-extraction-rag:local
+    env_file:
+      - .env
+    environment:
+      HF_HOME: /app/data/models
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - rag_data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=2g
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+volumes:
+  rag_data:
