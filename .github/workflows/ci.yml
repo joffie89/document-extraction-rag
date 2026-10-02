@@ -46,6 +46,9 @@ jobs:
           npm install --no-audit --no-fund
           npm run build
 
+      - name: Create CI environment file
+        run: cp .env.example .env
+
       - name: Validate Compose file
         run: docker compose config --quiet
 
