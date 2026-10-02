@@ -20,6 +20,7 @@ import requests
 
 BASE_URL = "http://127.0.0.1:8000/api/v1"
 
+
 def run_eval(csv_path, document_id):
     rows = []
     with open(csv_path, newline="", encoding="utf-8") as f:
