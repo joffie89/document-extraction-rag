@@ -99,6 +99,10 @@ uv run pytest -p no:cacheprovider -q
 
 No automated test makes a live OpenAI request. OpenAI results are replaced with
 fakes, while SQLite and ChromaDB use disposable local test directories.
+Tests also force the local token-count fallback and reject external network
+connections. Normal runtime continues to prefer tiktoken's `cl100k_base`, then
+falls back locally if its encoding data is unavailable. Set
+`DOCUMENT_RAG_OFFLINE=1` to skip the initial encoding download attempt entirely.
 
 ## Local frontend development
 

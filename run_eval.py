@@ -1,6 +1,6 @@
 """
 Automatically run every question in the eval CSV against your local RAG app
-and fill in the model_answer column for you.
+and fill in the model_answer and verdict columns.
 
 Usage:
     python run_eval.py rag_eval_filled.csv <document_id>
@@ -15,23 +15,51 @@ Your app must already be running (uvicorn) and the document already indexed
 
 import csv
 import sys
+from pathlib import Path
 
 import requests
 
 BASE_URL = "http://127.0.0.1:8000/api/v1"
 
 
-def run_eval(csv_path, document_id):
+def _normalize_answer(answer: str) -> str:
+    """Normalize insignificant whitespace and case for exact-match scoring."""
+
+    return " ".join(answer.casefold().split())
+
+
+def _answer_verdict(answer: str, expected_answer: str) -> str:
+    """Classify exact matches without pretending to judge paraphrases."""
+
+    if not answer:
+        return "EMPTY_ANSWER"
+    if expected_answer and _normalize_answer(answer) == _normalize_answer(
+        expected_answer,
+    ):
+        return "PASS"
+    return "ANSWERED"
+
+
+def run_eval(csv_path: str | Path, document_id: str) -> Path:
+    """Run the fixture against the local API and write an answered CSV."""
+
     rows = []
-    with open(csv_path, newline="", encoding="utf-8") as f:
+    input_path = Path(csv_path)
+    with input_path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        fieldnames = reader.fieldnames
+        fieldnames = list(reader.fieldnames or [])
         for row in reader:
             rows.append(row)
 
+    for required_field in ("model_answer", "verdict"):
+        if required_field not in fieldnames:
+            fieldnames.append(required_field)
+
     for i, row in enumerate(rows, start=1):
-        question = row["question"].strip()
+        question = row.get("question", "").strip()
         if not question:
+            row["model_answer"] = ""
+            row["verdict"] = "SKIPPED"
             continue
 
         print(f"[{i}/{len(rows)}] Asking: {question}")
@@ -46,20 +74,28 @@ def run_eval(csv_path, document_id):
             data = resp.json()
             answer = data.get("answer", "").replace("\n", " ").strip()
             row["model_answer"] = answer
+            row["verdict"] = _answer_verdict(
+                answer,
+                row.get("true_answer", "").strip(),
+            )
             print(f"    -> {answer[:100]}...")
         except Exception as e:
             row["model_answer"] = f"ERROR: {e}"
+            row["verdict"] = "ERROR"
             print(f"    -> ERROR: {e}")
 
-    out_path = csv_path.replace(".csv", "_answered.csv")
-    with open(out_path, "w", newline="", encoding="utf-8") as f:
+    out_path = input_path.with_name(
+        f"{input_path.stem}_answered{input_path.suffix or '.csv'}",
+    )
+    with out_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
     print(f"\nDone. Answers saved to: {out_path}")
-    print("Now open that file, compare model_answer vs true_answer for each row,")
-    print("and fill in the 'verdict' column yourself before running score_eval.py.")
+    print("PASS means an exact normalized match. Review ANSWERED rows for semantic")
+    print("equivalence; EMPTY_ANSWER, ERROR, and SKIPPED are execution outcomes.")
+    return out_path
 
 
 if __name__ == "__main__":

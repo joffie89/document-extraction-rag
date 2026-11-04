@@ -3,8 +3,9 @@
 import math
 import re
 
-import tiktoken
 from markdown_it import MarkdownIt
+
+from document_rag.infrastructure.token_encoding import get_token_encoding
 
 
 def semantic_units(markdown: str) -> list[str]:
@@ -111,7 +112,7 @@ def chunk_semantically(
     else:
         distance_threshold = math.inf
 
-    encoding = tiktoken.get_encoding("cl100k_base")
+    encoding = get_token_encoding()
     unit_token_counts = [len(encoding.encode(unit)) for unit in units]
     heading_pattern = re.compile(r"^(#{1,6})\s+(.+)$")
     heading_stack: dict[int, str] = {}

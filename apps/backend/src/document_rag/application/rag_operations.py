@@ -130,7 +130,7 @@ def answer_document_question(
     if not retrieved_chunks:
         raise LookupError("No indexed context was found for this document")
 
-    context_chunks = []
+    citation_sources = []
     used_context_ids = set()
 
     for chunk in retrieved_chunks:
@@ -140,23 +140,20 @@ def answer_document_question(
         if context_id in used_context_ids:
             continue
 
-        context_chunks.append(
-            {
-                "text": parent_text or str(chunk["text"]),
-                "heading_path": chunk.get("heading_path", ""),
-            },
-        )
+        citation_source = dict(chunk)
+        citation_source["text"] = parent_text or str(chunk["text"])
+        citation_sources.append(citation_source)
         used_context_ids.add(context_id)
 
     answer = generate_grounded_answer(
         openai_client,
         settings.GENERATION_MODEL,
         question,
-        context_chunks,
+        citation_sources,
     )
 
     return {
         "answer": answer,
-        "sources": retrieved_chunks,
+        "sources": citation_sources,
         "model": settings.GENERATION_MODEL,
     }

@@ -2,9 +2,8 @@
 
 import re
 
-import tiktoken
-
 from document_rag.infrastructure.chunking.semantic import semantic_units
+from document_rag.infrastructure.token_encoding import get_token_encoding
 
 
 def chunk_hierarchically(
@@ -23,7 +22,7 @@ def chunk_hierarchically(
     if not units:
         return []
 
-    encoding = tiktoken.get_encoding("cl100k_base")
+    encoding = get_token_encoding()
     heading_pattern = re.compile(r"^(#{1,6})\s+(.+)$")
     nodes: list[dict[str, object]] = [
         {
