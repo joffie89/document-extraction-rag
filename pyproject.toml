@@ -41,7 +41,7 @@ packages = ["apps/backend/src/document_rag"]
 
 [tool.pytest.ini_options]
 addopts = "-p no:cacheprovider"
-pythonpath = ["apps/backend/src"]
+pythonpath = [".", "apps/backend/src"]
 testpaths = ["apps/backend/tests"]
 
 [tool.ruff]

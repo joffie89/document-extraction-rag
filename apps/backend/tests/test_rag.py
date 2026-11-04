@@ -4,6 +4,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
+import document_rag.application.rag_operations as rag_operations
 from document_rag.application.rag_operations import (
     answer_document_question,
     prepare_document_for_rag,
@@ -80,6 +83,135 @@ def test_generate_grounded_answer_supplies_numbered_sources() -> None:
     assert request["model"] == "gpt-4.1-mini"
     assert "[Source 1] Safety > Equipment" in request["input"]
     assert request["store"] is False
+
+
+def test_answer_sources_keep_retrieval_order_and_prompt_passages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Returned source n should be the exact passage numbered n in the prompt."""
+
+    retrieved_chunks = [
+        {
+            "id": "document:b-child",
+            "parent_id": "document:b-parent",
+            "parent_text": "Expanded passage B.",
+            "text": "Child passage B.",
+            "heading_path": "Section B",
+            "ordinal": 9,
+        },
+        {
+            "id": "document:a-child",
+            "parent_id": "document:a-parent",
+            "parent_text": "Expanded passage A.",
+            "text": "Child passage A.",
+            "heading_path": "Section A",
+            "ordinal": 1,
+        },
+    ]
+    monkeypatch.setattr(
+        rag_operations,
+        "create_embeddings",
+        lambda *args: [[1.0, 0.0]],
+    )
+    monkeypatch.setattr(
+        rag_operations,
+        "query_document_chunks",
+        lambda *args: retrieved_chunks,
+    )
+    client = MagicMock()
+    client.responses.create.return_value = SimpleNamespace(
+        output_text="Use passage B [Source 1], then A [Source 2].",
+    )
+
+    result = answer_document_question(
+        MagicMock(),
+        client,
+        "document",
+        "Which passage applies?",
+        SimpleNamespace(
+            EMBEDDING_MODEL="text-embedding-3-small",
+            GENERATION_MODEL="gpt-4.1-mini",
+            RAG_TOP_K=2,
+        ),
+    )
+
+    prompt = client.responses.create.call_args.kwargs["input"]
+    assert [source["id"] for source in result["sources"]] == [
+        "document:b-child",
+        "document:a-child",
+    ]
+    assert [source["text"] for source in result["sources"]] == [
+        "Expanded passage B.",
+        "Expanded passage A.",
+    ]
+    assert prompt.index("[Source 1] Section B\nExpanded passage B.") < prompt.index(
+        "[Source 2] Section A\nExpanded passage A.",
+    )
+
+
+def test_answer_sources_deduplicate_retrieved_chunks_with_the_same_parent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Duplicate child hits must not shift later citation numbers."""
+
+    retrieved_chunks = [
+        {
+            "id": "document:b-child-2",
+            "parent_id": "document:b-parent",
+            "parent_text": "Expanded passage B.",
+            "text": "Second child from B.",
+            "heading_path": "Section B",
+        },
+        {
+            "id": "document:b-child-1",
+            "parent_id": "document:b-parent",
+            "parent_text": "Expanded passage B.",
+            "text": "First child from B.",
+            "heading_path": "Section B",
+        },
+        {
+            "id": "document:a-child",
+            "parent_id": "document:a-parent",
+            "parent_text": "Expanded passage A.",
+            "text": "Child from A.",
+            "heading_path": "Section A",
+        },
+    ]
+    monkeypatch.setattr(
+        rag_operations,
+        "create_embeddings",
+        lambda *args: [[1.0, 0.0]],
+    )
+    monkeypatch.setattr(
+        rag_operations,
+        "query_document_chunks",
+        lambda *args: retrieved_chunks,
+    )
+    client = MagicMock()
+    client.responses.create.return_value = SimpleNamespace(
+        output_text="Passage A is cited as [Source 2].",
+    )
+
+    result = answer_document_question(
+        MagicMock(),
+        client,
+        "document",
+        "What does A say?",
+        SimpleNamespace(
+            EMBEDDING_MODEL="text-embedding-3-small",
+            GENERATION_MODEL="gpt-4.1-mini",
+            RAG_TOP_K=3,
+        ),
+    )
+
+    prompt = client.responses.create.call_args.kwargs["input"]
+    assert [source["id"] for source in result["sources"]] == [
+        "document:b-child-2",
+        "document:a-child",
+    ]
+    assert prompt.count("[Source 1]") == 1
+    assert prompt.count("[Source 2]") == 1
+    assert "[Source 2] Section A\nExpanded passage A." in prompt
 
 
 def test_chroma_replaces_and_queries_document_chunks(tmp_path: Path) -> None:
