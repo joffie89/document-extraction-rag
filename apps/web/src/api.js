@@ -60,10 +60,10 @@ export async function prepareRag(documentId, strategy) {
 }
 
 /** Ask a question against an indexed document. */
-export async function askDocument(documentId, question) {
+export async function askDocument(documentId, question, strategy) {
   return request(`/documents/${documentId}/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, strategy }),
   });
 }

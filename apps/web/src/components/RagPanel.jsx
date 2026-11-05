@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { askDocument, prepareRag } from "../api";
 
@@ -13,6 +13,12 @@ export default function RagPanel({ document, onIndexed, onError }) {
   const canPrepare =
     document && ["ready", "indexed"].includes(document.status);
   const canAsk = document?.status === "indexed";
+
+  useEffect(() => {
+    if (document?.chunking_strategy) {
+      setStrategy(document.chunking_strategy);
+    }
+  }, [document?.id, document?.chunking_strategy]);
 
   /** Build the selected chunk index for the current Markdown. */
   async function handlePrepare() {
@@ -42,7 +48,7 @@ export default function RagPanel({ document, onIndexed, onError }) {
     setIsAsking(true);
 
     try {
-      const result = await askDocument(document.id, question);
+      const result = await askDocument(document.id, question, strategy);
       setAnswer(result.answer);
       setSources(result.sources);
     } catch (error) {

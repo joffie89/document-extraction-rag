@@ -9,6 +9,7 @@ from sqlalchemy import Engine
 
 from document_rag.application.document_operations import load_document_markdown
 from document_rag.infrastructure.chroma_store import (
+    delete_document_chunks,
     query_document_chunks,
     replace_document_chunks,
 )
@@ -50,6 +51,9 @@ def prepare_document_for_rag(
     save_document(engine, document)
 
     try:
+        if document.chunking_strategy is None:
+            delete_document_chunks(collection, document_id)
+
         if strategy == "semantic":
             units = semantic_units(markdown)
             unit_embeddings = create_embeddings(
@@ -113,6 +117,7 @@ def answer_document_question(
     document_id: str,
     question: str,
     settings: LazySettings,
+    strategy: str | None = None,
 ) -> dict[str, object]:
     """Retrieve document context, expand hierarchy, and generate an answer."""
 
@@ -126,6 +131,7 @@ def answer_document_question(
         document_id,
         query_embeddings[0],
         settings.RAG_TOP_K,
+        strategy,
     )
     if not retrieved_chunks:
         raise LookupError("No indexed context was found for this document")

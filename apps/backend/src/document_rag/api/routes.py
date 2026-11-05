@@ -23,6 +23,7 @@ from document_rag.application.rag_operations import (
     answer_document_question,
     prepare_document_for_rag,
 )
+from document_rag.infrastructure.chroma_store import delete_document_chunks
 from document_rag.infrastructure.database import find_document, list_documents
 from document_rag.infrastructure.docling.formats import (
     matching_formats,
@@ -154,6 +155,7 @@ def update_markdown(
             payload.markdown,
             request.app.state.settings.MARKDOWN_DIRECTORY,
         )
+        delete_document_chunks(request.app.state.collection, document_id)
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
@@ -213,6 +215,19 @@ def ask_document(
 ) -> RagAnswerResponse:
     """Answer a question from the document's active Chroma index."""
 
+    document = find_document(request.app.state.engine, document_id)
+    if document is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    strategy = payload.strategy or document.chunking_strategy
+    if document.status != "indexed" or strategy is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="Prepare this document for RAG before asking questions",
+        )
+
     try:
         result = answer_document_question(
             request.app.state.collection,
@@ -220,6 +235,7 @@ def ask_document(
             document_id,
             payload.question,
             request.app.state.settings,
+            strategy,
         )
     except LookupError as exc:
         raise HTTPException(

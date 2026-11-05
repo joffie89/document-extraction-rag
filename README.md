@@ -104,6 +104,33 @@ connections. Normal runtime continues to prefer tiktoken's `cl100k_base`, then
 falls back locally if its encoding data is unavailable. Set
 `DOCUMENT_RAG_OFFLINE=1` to skip the initial encoding download attempt entirely.
 
+## Batch corpus ingestion
+
+`ingest_corpus.py` is domain-neutral: it recursively discovers PDFs, uploads
+each changed file once, and prepares both semantic and hierarchical indexes.
+The API server must already be running because extraction and embedding use the
+normal application pipeline.
+
+```bash
+uv run python ingest_corpus.py
+```
+
+The default input is `data/corpus/`. Use `--corpus-dir <path>` for any other
+PDF collection. The script writes `ingestion_manifest.json` inside the selected
+corpus directory, recording each document ID and both stored strategies. Pass a
+strategy when querying either index:
+
+```json
+{"question": "What does the document say?", "strategy": "semantic"}
+```
+
+If `strategy` is omitted, the most recently prepared strategy remains the
+default, matching the interactive application behaviour. Successful entries are
+resumed by relative path and SHA-256 fingerprint; use `--force` to re-upload
+them. A failed file is recorded without stopping later PDFs. The supplied UK
+fraud and AML corpus is documented in `data/corpus/SOURCES.md`; its draft
+evaluation questions are in `evaluation/questions_v1.json`.
+
 ## Local frontend development
 
 Node.js 24 is required when running the UI outside Docker.
@@ -128,7 +155,7 @@ Vite proxies `/api` requests to the FastAPI server on port 8000.
 | `GET` | `/api/v1/documents/{id}/markdown` | Read extracted Markdown |
 | `PUT` | `/api/v1/documents/{id}/markdown` | Save edited Markdown |
 | `POST` | `/api/v1/documents/{id}/rag` | Build the selected index |
-| `POST` | `/api/v1/documents/{id}/ask` | Run a grounded question |
+| `POST` | `/api/v1/documents/{id}/ask` | Query a selected or active RAG strategy |
 
 ## Project structure
 

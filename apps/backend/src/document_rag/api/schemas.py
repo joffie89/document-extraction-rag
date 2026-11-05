@@ -46,6 +46,7 @@ class QuestionRequest(BaseModel):
     """Carry a question submitted to the document RAG system."""
 
     question: str = Field(min_length=1, max_length=2000)
+    strategy: Literal["semantic", "hierarchical"] | None = None
 
 
 class RagAnswerResponse(BaseModel):

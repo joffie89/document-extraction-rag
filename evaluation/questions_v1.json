@@ -1,0 +1,322 @@
+[
+  {
+    "id": "q001",
+    "question": "Which four groups make up the UK's 25 AML/CTF supervisors?",
+    "expected_answer": "The FCA, HMRC, the Gambling Commission, and 22 legal and accountancy professional body supervisors.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 7, Chapter 1, paragraph 1.3",
+    "type": "factual"
+  },
+  {
+    "id": "q002",
+    "question": "How many AML/CTF supervision applications did supervisors receive in 2023-24?",
+    "expected_answer": "13,058 applications.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 14, Table 2.A",
+    "type": "numeric"
+  },
+  {
+    "id": "q003",
+    "question": "What was the total AML/CTF supervised population in 2023-24?",
+    "expected_answer": "94,937 businesses.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 15, Table 2.B",
+    "type": "numeric"
+  },
+  {
+    "id": "q004",
+    "question": "Why must AML/CTF supervisors use a risk-based approach?",
+    "expected_answer": "To understand their population's risks and focus monitoring resources on activity most likely to be exploited by criminals.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "Chapter 2, Gatekeeping and risk assessment, paragraph 2.4",
+    "type": "factual"
+  },
+  {
+    "id": "q005",
+    "question": "How many direct AML/CTF supervision actions were conducted across all supervisors in 2023-24?",
+    "expected_answer": "9,013 direct supervision actions.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 30, Chapter 3, paragraph 3.6",
+    "type": "numeric"
+  },
+  {
+    "id": "q006",
+    "question": "What three kinds of monitoring intervention does the supervision report describe?",
+    "expected_answer": "Desk-based reviews, onsite visits, and other supervisory interventions.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "Chapter 3, Risk-based approach to supervision",
+    "type": "factual"
+  },
+  {
+    "id": "q007",
+    "question": "How was the 2023-24 supervised population split across high, medium, and low risk?",
+    "expected_answer": "9% high risk, 31% medium risk, and 60% low risk.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 15, Table 2.B",
+    "type": "multi-part"
+  },
+  {
+    "id": "q008",
+    "question": "How many requests, referrals, or requirements were reported under Regulations 50, 52, and 66?",
+    "expected_answer": "768 requests under Regulation 50, 2,580 referrals under Regulation 52, and 844 information requirements under Regulation 66.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 67, Chapter 5, paragraph 5.13",
+    "type": "multi-part"
+  },
+  {
+    "id": "q009",
+    "question": "How does Economic Crime Plan 2 define economic crime?",
+    "expected_answer": "Activity involving money, finance, or assets intended to obtain unlawful profit or advantage, or to cause loss to others.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "PDF page 8, Overview and approach, paragraph 1.1",
+    "type": "factual"
+  },
+  {
+    "id": "q010",
+    "question": "What identity-related capability was proposed for the Registrar of Companies?",
+    "expected_answer": "The ability to verify the identities of people setting up, managing, and owning companies.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "PDF page 18, paragraph 2.10",
+    "type": "factual"
+  },
+  {
+    "id": "q011",
+    "question": "How does Economic Crime Plan 2 define a kleptocracy?",
+    "expected_answer": "A highly corrupt political regime where power benefits a small elite and national wealth is widely stolen.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "Combat kleptocracy and drive down sanctions evasion, paragraph 3.1",
+    "type": "factual"
+  },
+  {
+    "id": "q012",
+    "question": "What was the total investment underpinning Economic Crime Plan 2?",
+    "expected_answer": "£400 million.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "PDF page 10, paragraph 1.11",
+    "type": "numeric"
+  },
+  {
+    "id": "q013",
+    "question": "How many additional full-time equivalent posts did the plan promise for money laundering and asset recovery?",
+    "expected_answer": "More than 475 FTE posts.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "Cross-cutting system reforms and capabilities, paragraph 6.11",
+    "type": "numeric"
+  },
+  {
+    "id": "q014",
+    "question": "What were the three headline outcomes of Economic Crime Plan 2?",
+    "expected_answer": "Reduce money laundering and recover more criminal assets; combat kleptocracy and sanctions evasion; and cut fraud.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "Overview and approach, paragraph 1.13",
+    "type": "multi-part"
+  },
+  {
+    "id": "q015",
+    "question": "How was the plan's £400 million investment funded, and over what period?",
+    "expected_answer": "£200 million from government and £200 million from the Economic Crime (Anti-Money Laundering) Levy, from FY 2022-23 through FY 2024-25.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "PDF page 10, paragraph 1.11",
+    "type": "multi-part"
+  },
+  {
+    "id": "q016",
+    "question": "What annual values did the plan associate with high-end and cash-based money laundering?",
+    "expected_answer": "Over £100 billion for high-end money laundering and over £12 billion for cash-based money laundering.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "PDF page 16, paragraph 2.1",
+    "type": "multi-part"
+  },
+  {
+    "id": "q017",
+    "question": "What two 2021-22 outcomes did the plan attribute to Suspicious Activity Reports?",
+    "expected_answer": "They identified just under 16,500 potentially vulnerable people and denied over £300 million to suspected criminals through DAML SARs.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "Improve intelligence, feedback and analysis through SARs reform, paragraph 2.23",
+    "type": "multi-part"
+  },
+  {
+    "id": "q018",
+    "question": "What service replaced Action Fraud as the national reporting route for fraud?",
+    "expected_answer": "Report Fraud, operational from 2026.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "Strategy page 42, Improving victims' experience, paragraph 101 (PDF page 45)",
+    "type": "factual"
+  },
+  {
+    "id": "q019",
+    "question": "What public-private centre will bring together data and expertise to coordinate interventions against online fraud and high-volume cyber crime?",
+    "expected_answer": "The Online Crime Centre (OCC).",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "Strategy page 14, Enhancing the UK's disruption capability, paragraphs 32-33 (PDF page 17)",
+    "type": "factual"
+  },
+  {
+    "id": "q020",
+    "question": "What new charter will set national standards for the service every fraud victim should receive?",
+    "expected_answer": "The Fraud Victims Charter.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "Strategy page 43, Improving victims' experience, paragraph 103 (PDF page 46)",
+    "type": "factual"
+  },
+  {
+    "id": "q021",
+    "question": "How much will the Government invest between 2026 and 2029 to deliver the Fraud Strategy?",
+    "expected_answer": "Over £250 million.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "Strategy page 4, Executive Summary, paragraph 3 (PDF page 7)",
+    "type": "numeric"
+  },
+  {
+    "id": "q022",
+    "question": "How much has the Government committed to launch the Online Crime Centre?",
+    "expected_answer": "£31 million.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "Strategy page 14, Enhancing the UK's disruption capability, paragraph 32 (PDF page 17)",
+    "type": "numeric"
+  },
+  {
+    "id": "q023",
+    "question": "How many individuals received a sentence for fraud in the year ending September 2025?",
+    "expected_answer": "3,631 individuals.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "Strategy page 50, Delivering justice through criminal and civil outcomes, paragraph 119 (PDF page 53)",
+    "type": "numeric"
+  },
+  {
+    "id": "q024",
+    "question": "How do the Strategy's three pillars describe its system-wide approach?",
+    "expected_answer": "DISRUPT makes it harder to commit fraud by disrupting exploited tools, methods, systems, and vulnerabilities; SAFEGUARD strengthens resilience so fraud can be detected and repelled before harm occurs; RESPOND provides a coordinated, victim-centred response spanning reporting, victim support, reimbursement, and criminal and civil justice.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "Strategy pages 4-5, Executive Summary, paragraphs 4-6 (PDF pages 7-8)",
+    "type": "multi-part"
+  },
+  {
+    "id": "q025",
+    "question": "What percentages of surveyed fraud victims experienced emotional or mental health symptoms, a physical health symptom, and behavioural change?",
+    "expected_answer": "92%, 57%, and 63%, respectively.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "Strategy page 9, The impact of fraud, paragraph 15 (PDF page 12)",
+    "type": "multi-part"
+  },
+  {
+    "id": "q026",
+    "question": "What three pillars will INTERPOL's planned Global Fraud Taskforce focus on?",
+    "expected_answer": "Tactical enforcement through arrests and asset seizures; strategic disruption through sanctions, supply-chain interference, and travel restrictions; and public-private partnerships to address industry enablers.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "Strategy page 49, International law enforcement collaboration, paragraph 118 (PDF page 52)",
+    "type": "multi-part"
+  },
+  {
+    "id": "q027",
+    "question": "Which stablecoin did the 2025 NRA say was most commonly used to launder money?",
+    "expected_answer": "Tether.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "Cryptoassets, paragraph 3.61",
+    "type": "factual"
+  },
+  {
+    "id": "q028",
+    "question": "What money-laundering risk rating did the 2025 NRA give retail banking?",
+    "expected_answer": "High.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "Retail Banking, paragraph 5.6",
+    "type": "factual"
+  },
+  {
+    "id": "q029",
+    "question": "How did the money-laundering risk rating for art market participants change since the previous NRA?",
+    "expected_answer": "It decreased from high to medium.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "Art Market Participants, paragraph 5.137",
+    "type": "factual"
+  },
+  {
+    "id": "q030",
+    "question": "Which three ratings can the NRA's adapted MoRiLE risk score produce?",
+    "expected_answer": "Low, medium, or high.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "Methodology, paragraph 1.15",
+    "type": "factual"
+  },
+  {
+    "id": "q031",
+    "question": "What share of UK adults did the 2024 FCA-commissioned survey find owned cryptoassets?",
+    "expected_answer": "12%.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "UK-wide money laundering risks, paragraph 3.4",
+    "type": "numeric"
+  },
+  {
+    "id": "q032",
+    "question": "How much cash was deposited at the Post Office each month according to the NRA?",
+    "expected_answer": "Between £2 billion and £3 billion per month.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "Cash, Post Office deposits",
+    "type": "numeric"
+  },
+  {
+    "id": "q033",
+    "question": "What four figures did the NRA give for fraud in the year ending December 2024?",
+    "expected_answer": "About 4.1 million incidents, over 43% of crime, a 33% annual increase, and 63% of Action Fraud reports cyber-enabled.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "PDF page 22, Fraud, paragraph 3.8",
+    "type": "multi-part"
+  },
+  {
+    "id": "q034",
+    "question": "How could AI both help money launderers and improve AML controls?",
+    "expected_answer": "It can support mule recruitment, synthetic identities, and evasion, but can also reduce false positives and improve behavioural and network analysis.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "Artificial Intelligence, paragraphs 6.1-6.7",
+    "type": "multi-part"
+  },
+  {
+    "id": "q035",
+    "question": "Which commercial vendor and algorithm does Companies House use for identity verification?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents"
+  },
+  {
+    "id": "q036",
+    "question": "How many convictions did the National Fraud Squad secure during calendar year 2026?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents"
+  },
+  {
+    "id": "q037",
+    "question": "What was the total fraud loss recorded in Scotland in October 2025?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents"
+  },
+  {
+    "id": "q038",
+    "question": "Which blockchain analytics vendor did the FCA procure in 2025, and what was the contract price?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents"
+  },
+  {
+    "id": "q039",
+    "question": "What percentage reduction in AML false positives did a named UK bank achieve using AI?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents"
+  },
+  {
+    "id": "q040",
+    "question": "How many sanctions-evasion prosecutions were completed in Northern Ireland in 2024-25?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents"
+  }
+]

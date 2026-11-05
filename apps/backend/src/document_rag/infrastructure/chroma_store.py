@@ -30,6 +30,15 @@ def prepare_collection(
     )
 
 
+def delete_document_chunks(
+    collection: Collection,
+    document_id: str,
+) -> None:
+    """Delete every stored strategy for one document."""
+
+    collection.delete(where={"document_id": document_id})
+
+
 def replace_document_chunks(
     collection: Collection,
     document_id: str,
@@ -37,14 +46,20 @@ def replace_document_chunks(
     chunks: list[dict[str, object]],
     embeddings: list[list[float]],
 ) -> int:
-    """Replace one document's vectors with a complete chunk set."""
+    """Replace one document strategy's vectors with a complete chunk set."""
 
     if strategy not in {"semantic", "hierarchical"}:
         raise ValueError("Chunking strategy must be semantic or hierarchical")
     if len(chunks) != len(embeddings):
         raise ValueError("Each indexed chunk requires one embedding")
 
-    collection.delete(where={"document_id": document_id})
+    strategy_filter = {
+        "$and": [
+            {"document_id": document_id},
+            {"strategy": strategy},
+        ],
+    }
+    collection.delete(where=strategy_filter)
     if not chunks:
         return 0
 
@@ -94,6 +109,7 @@ def query_document_chunks(
     document_id: str,
     query_embedding: list[float],
     result_count: int,
+    strategy: str | None = None,
 ) -> list[dict[str, object]]:
     """Retrieve the closest chunks for one indexed document."""
 
@@ -101,15 +117,26 @@ def query_document_chunks(
         raise ValueError("A query embedding is required")
     if result_count < 1:
         raise ValueError("The result count must be positive")
+    if strategy is not None and strategy not in {"semantic", "hierarchical"}:
+        raise ValueError("Chunking strategy must be semantic or hierarchical")
 
     collection_size = collection.count()
     if collection_size == 0:
         return []
 
+    where: dict[str, object] = {"document_id": document_id}
+    if strategy is not None:
+        where = {
+            "$and": [
+                {"document_id": document_id},
+                {"strategy": strategy},
+            ],
+        }
+
     results = collection.query(
         query_embeddings=[query_embedding],
         n_results=min(result_count, collection_size),
-        where={"document_id": document_id},
+        where=where,
         include=["documents", "metadatas", "distances"],
     )
     ids = results.get("ids") or [[]]

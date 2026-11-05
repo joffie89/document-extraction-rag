@@ -5,7 +5,14 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .coverage
-data/
+data/*
+!data/corpus/
+data/corpus/*
+!data/corpus/aml_ctf_supervision_report_2023_24.pdf
+!data/corpus/economic_crime_plan_2_2023_2026.pdf
+!data/corpus/fraud_strategy_2026_2029.pdf
+!data/corpus/national_risk_assessment_ml_tf_2025.pdf
+!data/corpus/SOURCES.md
 *.db
 apps/web/node_modules/
 apps/web/dist/

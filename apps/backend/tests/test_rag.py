@@ -214,8 +214,10 @@ def test_answer_sources_deduplicate_retrieved_chunks_with_the_same_parent(
     assert "[Source 2] Section A\nExpanded passage A." in prompt
 
 
-def test_chroma_replaces_and_queries_document_chunks(tmp_path: Path) -> None:
-    """Chroma should replace stale vectors and return the nearest chunk."""
+def test_chroma_keeps_both_strategies_and_replaces_them_independently(
+    tmp_path: Path,
+) -> None:
+    """Each strategy should remain queryable and replace only its own chunks."""
 
     collection = prepare_collection(tmp_path / "chroma", "test_chunks")
     chunks = [
@@ -247,6 +249,7 @@ def test_chroma_replaces_and_queries_document_chunks(tmp_path: Path) -> None:
         document_id="safety-guide",
         query_embedding=[0.99, 0.01],
         result_count=2,
+        strategy="semantic",
     )
     replacement_count = replace_document_chunks(
         collection,
@@ -264,12 +267,62 @@ def test_chroma_replaces_and_queries_document_chunks(tmp_path: Path) -> None:
         ],
         embeddings=[[1.0, 0.0]],
     )
+    hierarchical_results = query_document_chunks(
+        collection,
+        document_id="safety-guide",
+        query_embedding=[1.0, 0.0],
+        result_count=2,
+        strategy="hierarchical",
+    )
+    semantic_results = query_document_chunks(
+        collection,
+        document_id="safety-guide",
+        query_embedding=[1.0, 0.0],
+        result_count=2,
+        strategy="semantic",
+    )
+    semantic_replacement_count = replace_document_chunks(
+        collection,
+        document_id="safety-guide",
+        strategy="semantic",
+        chunks=[
+            {
+                "text": "Updated semantic eye-protection guidance.",
+                "kind": "semantic",
+                "level": 0,
+            },
+        ],
+        embeddings=[[1.0, 0.0]],
+    )
+    updated_semantic_results = query_document_chunks(
+        collection,
+        document_id="safety-guide",
+        query_embedding=[1.0, 0.0],
+        result_count=2,
+        strategy="semantic",
+    )
+    preserved_hierarchical_results = query_document_chunks(
+        collection,
+        document_id="safety-guide",
+        query_embedding=[1.0, 0.0],
+        result_count=2,
+        strategy="hierarchical",
+    )
 
     assert indexed_count == 2
     assert results[0]["heading_path"] == "Safety > Equipment"
     assert results[0]["distance"] < results[1]["distance"]
     assert replacement_count == 1
-    assert collection.count() == 1
+    assert hierarchical_results[0]["strategy"] == "hierarchical"
+    assert all(result["strategy"] == "semantic" for result in semantic_results)
+    assert semantic_replacement_count == 1
+    assert updated_semantic_results[0]["text"] == (
+        "Updated semantic eye-protection guidance."
+    )
+    assert preserved_hierarchical_results[0]["text"] == (
+        "Use replacement eye protection."
+    )
+    assert collection.count() == 2
 
 
 def test_rag_workflow_indexes_and_answers_without_live_api(tmp_path: Path) -> None:
@@ -327,6 +380,20 @@ def test_rag_workflow_indexes_and_answers_without_live_api(tmp_path: Path) -> No
     openai_client.responses.create.return_value = SimpleNamespace(
         output_text="Wear safety glasses [Source 1].",
     )
+    replace_document_chunks(
+        collection,
+        document.id,
+        strategy="hierarchical",
+        chunks=[
+            {
+                "id": f"{document.id}:stale",
+                "text": "Stale guidance from before a Markdown edit.",
+                "kind": "paragraph",
+                "level": 1,
+            },
+        ],
+        embeddings=[[1.0, 0.0]],
+    )
 
     chunks = prepare_document_for_rag(
         engine,
@@ -342,13 +409,22 @@ def test_rag_workflow_indexes_and_answers_without_live_api(tmp_path: Path) -> No
         document.id,
         "What protects a worker's eyes?",
         settings,
+        strategy="semantic",
     )
     indexed_document = find_document(engine, document.id)
+    stale_results = query_document_chunks(
+        collection,
+        document.id,
+        query_embedding=[1.0, 0.0],
+        result_count=1,
+        strategy="hierarchical",
+    )
 
     assert len(chunks) == len(expected_chunks)
     assert collection.count() == len(expected_chunks)
     assert indexed_document is not None
     assert indexed_document.status == "indexed"
     assert indexed_document.chunking_strategy == "semantic"
+    assert stale_results == []
     assert result["answer"] == "Wear safety glasses [Source 1]."
     assert result["sources"]

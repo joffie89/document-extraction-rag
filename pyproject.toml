@@ -13,6 +13,7 @@ dependencies = [
     "markdown-it-py>=4,<5",
     "openai>=3.5,<4",
     "python-multipart>=0.0.22,<1",
+    "requests>=2.32,<3",
     "sqlalchemy>=2.0,<3",
     "tiktoken>=0.12,<1",
     "torch>=2.7,<3",

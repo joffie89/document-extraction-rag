@@ -97,7 +97,8 @@ def test_api_supports_document_editing_and_rag_requests(
         markdown_path=str(markdown_path),
         media_type="text/markdown",
         size_bytes=markdown_path.stat().st_size,
-        status="ready",
+        status="indexed",
+        chunking_strategy="hierarchical",
     )
     save_document(engine, document)
 
@@ -142,17 +143,27 @@ def test_api_supports_document_editing_and_rag_requests(
         markdown_response = client.get(
             f"/api/v1/documents/{document_id}/markdown",
         )
+        answer_response = client.post(
+            f"/api/v1/documents/{document_id}/ask",
+            json={
+                "question": "What protects the eyes?",
+                "strategy": "hierarchical",
+            },
+        )
         edit_response = client.put(
             f"/api/v1/documents/{document_id}/markdown",
             json={"markdown": "# Revised safety\n"},
         )
+        stale_answer_response = client.post(
+            f"/api/v1/documents/{document_id}/ask",
+            json={
+                "question": "What protects the eyes?",
+                "strategy": "hierarchical",
+            },
+        )
         rag_response = client.post(
             f"/api/v1/documents/{document_id}/rag",
             json={"strategy": "hierarchical"},
-        )
-        answer_response = client.post(
-            f"/api/v1/documents/{document_id}/ask",
-            json={"question": "What protects the eyes?"},
         )
         upload_response = client.post(
             "/api/v1/documents",
@@ -164,8 +175,13 @@ def test_api_supports_document_editing_and_rag_requests(
     assert documents_response.json()[0]["id"] == document_id
     assert markdown_response.json()["markdown"].startswith("# Safety")
     assert edit_response.json()["status"] == "ready"
+    assert stale_answer_response.status_code == 409
     assert rag_response.json()["chunk_count"] == 2
     assert rag_response.json()["strategy"] == "hierarchical"
     assert answer_response.json()["model"] == "gpt-4.1-mini"
+    assert answer_mock.call_args.args[-1] == "hierarchical"
+    application.state.collection.delete.assert_called_once_with(
+        where={"document_id": document_id},
+    )
     assert upload_response.status_code == 202
     process_mock.assert_called_once()
