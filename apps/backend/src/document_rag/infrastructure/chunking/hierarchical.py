@@ -2,7 +2,7 @@
 
 import re
 
-from document_rag.infrastructure.chunking.semantic import semantic_units
+from document_rag.infrastructure.chunking.semantic import semantic_units_with_pages
 from document_rag.infrastructure.token_encoding import get_token_encoding
 
 
@@ -18,7 +18,7 @@ def chunk_hierarchically(
     if max_leaf_tokens < 1:
         raise ValueError("The leaf token limit must be positive")
 
-    units = semantic_units(markdown)
+    units, unit_page_numbers = semantic_units_with_pages(markdown)
     if not units:
         return []
 
@@ -35,13 +35,14 @@ def chunk_hierarchically(
             "token_count": 0,
             "heading_path": "",
             "ancestor_ids": [],
+            "page_numbers": [],
         },
     ]
     root_node = nodes[0]
     section_stack: dict[int, dict[str, object]] = {}
     current_parent = root_node
 
-    for unit in units:
+    for unit, pages in zip(units, unit_page_numbers, strict=True):
         first_line = unit.splitlines()[0]
         heading_match = heading_pattern.match(first_line)
 
@@ -78,6 +79,7 @@ def chunk_hierarchically(
                     *list(parent_node["ancestor_ids"]),
                     parent_node["id"],
                 ],
+                "page_numbers": list(pages),
             }
             nodes.append(section_node)
             section_stack[heading_level] = section_node
@@ -112,6 +114,7 @@ def chunk_hierarchically(
                         *list(current_parent["ancestor_ids"]),
                         current_parent["id"],
                     ],
+                    "page_numbers": list(pages),
                 },
             )
 
@@ -132,10 +135,19 @@ def chunk_hierarchically(
         context_parts.extend(descendant_texts)
         node["text"] = "\n\n".join(context_parts)
         node["token_count"] = len(encoding.encode(str(node["text"])))
+        descendant_pages = {
+            int(page)
+            for leaf in leaf_nodes
+            if node["id"] in leaf["ancestor_ids"]
+            for page in list(leaf["page_numbers"])
+        }
+        descendant_pages.update(int(page) for page in list(node["page_numbers"]))
+        node["page_numbers"] = sorted(descendant_pages)
 
     nodes_by_id = {str(node["id"]): node for node in nodes}
     for leaf in leaf_nodes:
         parent_id = str(leaf["parent_id"])
         leaf["parent_text"] = nodes_by_id[parent_id]["text"]
+        leaf["parent_page_numbers"] = nodes_by_id[parent_id]["page_numbers"]
 
     return nodes

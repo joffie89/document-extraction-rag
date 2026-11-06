@@ -8,6 +8,7 @@ from document_rag.infrastructure.chunking.hierarchical import (
 from document_rag.infrastructure.chunking.semantic import (
     chunk_semantically,
     semantic_units,
+    semantic_units_with_pages,
 )
 
 
@@ -50,6 +51,46 @@ def test_semantic_chunking_detects_topic_change() -> None:
     assert "Kittens" in str(chunks[0]["text"])
     assert "Databases" not in str(chunks[0]["text"])
     assert "Databases" in str(chunks[1]["text"])
+
+
+def test_chunkers_propagate_exact_page_unions() -> None:
+    """Both strategies should retain leaf and expanded-context pages."""
+
+    markdown = """<!-- docling-page: 1 -->
+
+# Guide
+
+First-page guidance.
+
+<!-- docling-page: 3 -->
+
+Third-page guidance.
+"""
+    units, unit_pages = semantic_units_with_pages(markdown)
+    semantic_chunks = chunk_semantically(
+        units,
+        [[1.0, 0.0] for _ in units],
+        break_percentile=80,
+        min_tokens=1,
+        max_tokens=100,
+        unit_page_numbers=unit_pages,
+    )
+    hierarchy = chunk_hierarchically(
+        markdown,
+        document_id="guide",
+        max_leaf_tokens=100,
+    )
+    third_page_leaf = next(
+        node
+        for node in hierarchy
+        if node["kind"] == "paragraph" and "Third-page" in str(node["text"])
+    )
+
+    assert unit_pages == [[1], [1], [3]]
+    assert all("docling-page" not in unit for unit in units)
+    assert semantic_chunks[0]["page_numbers"] == [1, 3]
+    assert third_page_leaf["page_numbers"] == [3]
+    assert third_page_leaf["parent_page_numbers"] == [1, 3]
 
 
 def test_hierarchical_chunking_preserves_parent_context() -> None:

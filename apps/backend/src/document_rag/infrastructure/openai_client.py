@@ -38,6 +38,8 @@ def generate_grounded_answer(
     model: str,
     question: str,
     retrieved_chunks: list[dict[str, object]],
+    *,
+    temperature: float = 0.2,
 ) -> str:
     """Answer from retrieved context and require inline source references."""
 
@@ -63,7 +65,7 @@ def generate_grounded_answer(
         ),
         input=f"Question:\n{question.strip()}\n\nSources:\n{context}",
         max_output_tokens=800,
-        temperature=0.2,
+        temperature=temperature,
         store=False,
     )
     answer = response.output_text.strip()

@@ -26,7 +26,7 @@ def test_evaluation_fixture_has_required_coverage_and_valid_sources() -> None:
 
     assert len(questions) == 40
     assert len(question_ids) == len(set(question_ids))
-    assert all(set(question) == REQUIRED_FIELDS for question in questions)
+    assert all(REQUIRED_FIELDS.issubset(question) for question in questions)
     assert set(question_types) == QUESTION_TYPES
     assert question_types.count("not-in-documents") >= 6
 

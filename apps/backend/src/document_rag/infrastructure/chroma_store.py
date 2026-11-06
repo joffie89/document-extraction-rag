@@ -7,6 +7,19 @@ from chromadb.api.models.Collection import Collection
 from chromadb.config import Settings
 
 
+def _page_numbers(value: object) -> list[int]:
+    """Normalize chunk page metadata for scalar Chroma storage."""
+
+    if isinstance(value, str):
+        candidates = value.split(",")
+    elif isinstance(value, (list, tuple, set)):
+        candidates = value
+    else:
+        candidates = []
+
+    return sorted({int(page) for page in candidates if str(page).strip()})
+
+
 def prepare_collection(
     chroma_directory: str | Path,
     collection_name: str,
@@ -86,6 +99,19 @@ def replace_document_chunks(
         parent_text = str(chunk.get("parent_text") or "").strip()
         if parent_text:
             metadata["parent_text"] = parent_text
+        source_file = str(chunk.get("source_file") or "").strip()
+        if source_file:
+            metadata["source_file"] = source_file
+        pages = _page_numbers(chunk.get("page_numbers"))
+        if pages:
+            metadata["page_numbers"] = ",".join(str(page) for page in pages)
+            metadata["page_start"] = pages[0]
+            metadata["page_end"] = pages[-1]
+        parent_pages = _page_numbers(chunk.get("parent_page_numbers"))
+        if parent_pages:
+            metadata["parent_page_numbers"] = ",".join(
+                str(page) for page in parent_pages
+            )
 
         ids.append(chunk_id)
         documents.append(text)
@@ -113,16 +139,8 @@ def query_document_chunks(
 ) -> list[dict[str, object]]:
     """Retrieve the closest chunks for one indexed document."""
 
-    if not query_embedding:
-        raise ValueError("A query embedding is required")
-    if result_count < 1:
-        raise ValueError("The result count must be positive")
     if strategy is not None and strategy not in {"semantic", "hierarchical"}:
         raise ValueError("Chunking strategy must be semantic or hierarchical")
-
-    collection_size = collection.count()
-    if collection_size == 0:
-        return []
 
     where: dict[str, object] = {"document_id": document_id}
     if strategy is not None:
@@ -133,11 +151,47 @@ def query_document_chunks(
             ],
         }
 
+    return _query_chunks(collection, query_embedding, result_count, where=where)
+
+
+def query_collection_chunks(
+    collection: Collection,
+    query_embedding: list[float],
+    result_count: int,
+) -> list[dict[str, object]]:
+    """Retrieve the closest chunks across an entire collection."""
+
+    return _query_chunks(collection, query_embedding, result_count)
+
+
+def _query_chunks(
+    collection: Collection,
+    query_embedding: list[float],
+    result_count: int,
+    *,
+    where: dict[str, object] | None = None,
+) -> list[dict[str, object]]:
+    """Run one validated nearest-neighbour query with an optional filter."""
+
+    if not query_embedding:
+        raise ValueError("A query embedding is required")
+    if result_count < 1:
+        raise ValueError("The result count must be positive")
+
+    collection_size = collection.count()
+    if collection_size == 0:
+        return []
+
+    query_arguments: dict[str, object] = {
+        "query_embeddings": [query_embedding],
+        "n_results": min(result_count, collection_size),
+        "include": ["documents", "metadatas", "distances"],
+    }
+    if where is not None:
+        query_arguments["where"] = where
+
     results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=min(result_count, collection_size),
-        where=where,
-        include=["documents", "metadatas", "distances"],
+        **query_arguments,
     )
     ids = results.get("ids") or [[]]
     documents = results.get("documents") or [[]]

@@ -227,6 +227,8 @@ def test_chroma_keeps_both_strategies_and_replaces_them_independently(
             "kind": "semantic",
             "level": 0,
             "heading_path": "Safety > Equipment",
+            "source_file": "safety.pdf",
+            "page_numbers": [2, 3],
         },
         {
             "text": "Evacuate when the alarm sounds.",
@@ -234,6 +236,8 @@ def test_chroma_keeps_both_strategies_and_replaces_them_independently(
             "kind": "semantic",
             "level": 0,
             "heading_path": "Safety > Emergencies",
+            "source_file": "safety.pdf",
+            "page_numbers": [4],
         },
     ]
 
@@ -263,6 +267,9 @@ def test_chroma_keeps_both_strategies_and_replaces_them_independently(
                 "level": 2,
                 "parent_id": "safety-guide:section",
                 "parent_text": "# Equipment\n\nUse replacement eye protection.",
+                "source_file": "safety.pdf",
+                "page_numbers": [5],
+                "parent_page_numbers": [5, 6],
             },
         ],
         embeddings=[[1.0, 0.0]],
@@ -311,9 +318,14 @@ def test_chroma_keeps_both_strategies_and_replaces_them_independently(
 
     assert indexed_count == 2
     assert results[0]["heading_path"] == "Safety > Equipment"
+    assert results[0]["source_file"] == "safety.pdf"
+    assert results[0]["page_numbers"] == "2,3"
+    assert results[0]["page_start"] == 2
+    assert results[0]["page_end"] == 3
     assert results[0]["distance"] < results[1]["distance"]
     assert replacement_count == 1
     assert hierarchical_results[0]["strategy"] == "hierarchical"
+    assert hierarchical_results[0]["parent_page_numbers"] == "5,6"
     assert all(result["strategy"] == "semantic" for result in semantic_results)
     assert semantic_replacement_count == 1
     assert updated_semantic_results[0]["text"] == (
@@ -428,3 +440,7 @@ def test_rag_workflow_indexes_and_answers_without_live_api(tmp_path: Path) -> No
     assert stale_results == []
     assert result["answer"] == "Wear safety glasses [Source 1]."
     assert result["sources"]
+    assert all(chunk["source_file"] == "sample.md" for chunk in chunks)
+    assert all(chunk["page_numbers"] == [1] for chunk in chunks)
+    assert result["sources"][0]["source_file"] == "sample.md"
+    assert result["sources"][0]["page_numbers"] == "1"

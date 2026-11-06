@@ -11,6 +11,27 @@ from document_rag.infrastructure.docling.formats import matching_formats
 
 logger = logging.getLogger(__name__)
 
+PAGE_MARKER_TEMPLATE = "<!-- docling-page: {page_number} -->"
+
+
+def _export_markdown_with_page_markers(document: object) -> str:
+    """Export Markdown with exact physical page markers when available."""
+
+    pages = getattr(document, "pages", {})
+    page_numbers = sorted(int(page_number) for page_number in pages)
+    if not page_numbers:
+        return document.export_to_markdown()
+
+    sections = []
+    for page_number in page_numbers:
+        page_markdown = document.export_to_markdown(page_no=page_number).strip()
+        section = PAGE_MARKER_TEMPLATE.format(page_number=page_number)
+        if page_markdown:
+            section = f"{section}\n\n{page_markdown}"
+        sections.append(section)
+
+    return "\n\n".join(sections)
+
 
 def extract_markdown(
     converter: DocumentConverter,
@@ -54,6 +75,6 @@ def extract_markdown(
             f"Document extraction ended with status {result.status.value}",
         )
 
-    markdown = result.document.export_to_markdown()
+    markdown = _export_markdown_with_page_markers(result.document)
 
     return markdown, result.status.value, errors
