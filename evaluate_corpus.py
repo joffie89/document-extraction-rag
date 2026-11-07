@@ -60,7 +60,13 @@ PHYSICAL_PAGE_PATTERN = re.compile(
     r"\bPDF\s+pages?\s+(\d+)(?:\s*[-–]\s*(\d+))?",
     re.IGNORECASE,
 )
-CITATION_PATTERN = re.compile(r"\[(?:Source\s+)?(\d+)\]", re.IGNORECASE)
+CITATION_BRACKET_PATTERN = re.compile(r"\[([^\[\]]+)\]")
+PLAIN_CITATION_LIST_PATTERN = re.compile(r"\d+(?:\s*,\s*\d+)*")
+SOURCE_CITATION_LIST_PATTERN = re.compile(
+    r"\bSources?\s+"
+    r"(\d+(?![\d.])(?:\s*,\s*(?:Sources?\s+)?\d+(?![\d.]))*)",
+    re.IGNORECASE,
+)
 JUDGE_LABELS = {"correct", "partially correct", "incorrect"}
 
 
@@ -427,8 +433,7 @@ def citation_score(
     """Validate every cited source number and its expected document/page target."""
 
     references = []
-    for match in CITATION_PATTERN.finditer(answer):
-        number = int(match.group(1))
+    for number in citation_numbers(answer):
         exists = 1 <= number <= len(sources)
         source = sources[number - 1] if exists else {}
         source_file = source.get("source_file") if exists else None
@@ -464,6 +469,23 @@ def citation_score(
         "target_applicable": target_applicable,
         "all_match_expected": all_match,
     }
+
+
+def citation_numbers(answer: str) -> list[int]:
+    """Extract source indexes from supported citation bracket forms."""
+
+    numbers = []
+    for bracket in CITATION_BRACKET_PATTERN.finditer(answer):
+        content = bracket.group(1).strip()
+        if PLAIN_CITATION_LIST_PATTERN.fullmatch(content):
+            numbers.extend(int(value) for value in re.findall(r"\d+", content))
+            continue
+
+        for source_list in SOURCE_CITATION_LIST_PATTERN.finditer(content):
+            numbers.extend(
+                int(value) for value in re.findall(r"\d+", source_list.group(1))
+            )
+    return numbers
 
 
 def judge_answer(
@@ -539,6 +561,21 @@ def _serialize_chunk(chunk: dict[str, object], rank: int) -> dict[str, object]:
         "heading_path": str(chunk.get("heading_path") or ""),
         "kind": str(chunk.get("kind") or ""),
     }
+
+
+def _serialize_answer_sources(
+    sources: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Keep every prompt source in the exact order used by answer citations."""
+
+    return [
+        {
+            "rank": rank,
+            "source_file": source.get("source_file"),
+            "page_numbers": sorted(chunk_page_numbers(source)),
+        }
+        for rank, source in enumerate(sources, start=1)
+    ]
 
 
 def _aggregate_usage(records: list[UsageRecord]) -> dict[str, object]:
@@ -791,6 +828,7 @@ def evaluate_strategy(
                 "expected_pages": sorted(expected_pages),
                 "retrieval": retrieval,
                 "answer": answer,
+                "answer_sources": _serialize_answer_sources(answer_sources),
                 "judge": judgment,
                 "citations": citations,
                 "latency_seconds": {
@@ -1134,7 +1172,7 @@ def run_evaluation(
             if record.phase == f"indexing:{strategy}"
         ]
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "strategy": strategy,
             "run": {
                 "run_id": run_id,

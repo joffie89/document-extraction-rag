@@ -163,12 +163,39 @@ def test_citation_scoring_checks_every_reference_and_target() -> None:
         "expected.pdf",
         {7},
     )
+    grouped = evaluate_corpus.citation_score(
+        "One right source and one wrong page [Source 1, Source 2].",
+        sources,
+        "expected.pdf",
+        {7},
+    )
 
     assert accurate["all_exist"] is True
     assert accurate["all_match_expected"] is True
     assert inaccurate["all_exist"] is False
     assert inaccurate["all_match_expected"] is False
     assert inaccurate["references"][1]["exists"] is False
+    assert [reference["number"] for reference in grouped["references"]] == [1, 2]
+    assert grouped["all_match_expected"] is False
+
+
+@pytest.mark.parametrize(
+    ("citation", "expected_numbers"),
+    [
+        ("[1, 2]", [1, 2]),
+        ("[Source 1, Source 2]", [1, 2]),
+        ("[Sources 2, 4, 5]", [2, 4, 5]),
+        ("[Source 2, 2.3]", [2]),
+        ("[Source 4, section 1.1]", [4]),
+    ],
+)
+def test_citation_numbers_support_grouped_and_annotated_forms(
+    citation: str,
+    expected_numbers: list[int],
+) -> None:
+    """Grouped citations are expanded without treating annotations as sources."""
+
+    assert evaluate_corpus.citation_numbers(citation) == expected_numbers
 
 
 def test_metered_client_uses_actual_usage_and_stops_before_overspend() -> None:
@@ -259,8 +286,30 @@ def test_strategy_evaluation_with_fakes_and_report(tmp_path) -> None:
             "text": "Safety glasses protect the eyes.",
             "source_file": "safety.pdf",
             "page_numbers": "7",
+            "parent_id": "parent-1",
+            "parent_text": "Safety glasses protect the eyes and face.",
+            "parent_page_numbers": "7,8",
             "distance": 0.01,
             "heading_path": "Safety",
+        },
+        {
+            "id": "chunk-2",
+            "text": "A face shield protects the face.",
+            "source_file": "safety.pdf",
+            "page_numbers": "8",
+            "parent_id": "parent-1",
+            "parent_text": "Safety glasses protect the eyes and face.",
+            "parent_page_numbers": "7,8",
+            "distance": 0.02,
+            "heading_path": "Safety",
+        },
+        {
+            "id": "chunk-3",
+            "text": "Unrelated context.",
+            "source_file": "other.pdf",
+            "page_numbers": "3",
+            "distance": 0.03,
+            "heading_path": "Other",
         },
     ]
     raw_client = fake_client()
@@ -311,6 +360,20 @@ def test_strategy_evaluation_with_fakes_and_report(tmp_path) -> None:
 
     assert temperatures == [0]
     assert results[0]["retrieval"]["first_hit_rank"] == 1
+    assert results[0]["answer_sources"] == [
+        {
+            "rank": 1,
+            "source_file": "safety.pdf",
+            "page_numbers": [7, 8],
+        },
+        {"rank": 2, "source_file": "other.pdf", "page_numbers": [3]},
+    ]
+    assert evaluate_corpus.citation_score(
+        results[0]["answer"],
+        results[0]["answer_sources"],
+        "safety.pdf",
+        {7},
+    ) == results[0]["citations"]
     assert results[0]["citations"]["all_match_expected"] is True
     assert summary["correct_rate"] == 1
     assert "## Overall results" in report
