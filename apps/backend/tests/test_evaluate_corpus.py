@@ -49,6 +49,35 @@ def fake_client(
     )
 
 
+@pytest.mark.parametrize(
+    ("page_or_section", "expected_pages"),
+    [
+        ("PDF page 15, Table 2.B", {15}),
+        (
+            "PDF pages 14-15, Table 2.B "
+            "(heading and figures split across pages)",
+            {14, 15},
+        ),
+        (
+            "Strategy page 42, Improving victims' experience, paragraph 101 "
+            "(PDF page 45)",
+            {45},
+        ),
+        (
+            "PDF pages 139-140, Artificial Intelligence, paragraphs 6.1-6.7",
+            {139, 140},
+        ),
+    ],
+)
+def test_parse_expected_pages_uses_physical_pdf_pages(
+    page_or_section: str,
+    expected_pages: set[int],
+) -> None:
+    """PDF-labelled pages should win and ranges should expand inclusively."""
+
+    assert evaluate_corpus.parse_expected_pages(page_or_section) == expected_pages
+
+
 def test_page_parsing_and_source_page_retrieval_rank() -> None:
     """Printed strategy pages must not displace explicit physical PDF pages."""
 
