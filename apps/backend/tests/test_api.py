@@ -39,6 +39,10 @@ def test_load_settings_reads_valid_dotenv_values(tmp_path: Path) -> None:
     assert application_settings.ENVIRONMENT == "test"
     assert application_settings.MAX_CHUNK_TOKENS == 640
     assert application_settings.OCR_LANGUAGE == "en"
+    assert application_settings.RAG_TOP_K == 5
+    assert application_settings.RAG_RETRIEVAL_MODE == "embedding"
+    assert application_settings.RAG_DOCUMENT_HINT_MODE == "none"
+    assert application_settings.RAG_STRICT_GROUNDING is False
 
 
 def test_load_settings_rejects_invalid_token_range(tmp_path: Path) -> None:
@@ -54,6 +58,36 @@ def test_load_settings_rejects_invalid_token_range(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="MIN_CHUNK_TOKENS"):
         load_settings(env_file)
+
+
+def test_load_settings_defaults_new_rag_options_for_legacy_env(
+    tmp_path: Path,
+) -> None:
+    """Existing environments should retain embedding retrieval and the old prompt."""
+
+    environment_lines = ENV_EXAMPLE.read_text(encoding="utf-8").splitlines()
+    new_option_names = {
+        "RAG_RETRIEVAL_MODE",
+        "RAG_RRF_K",
+        "RAG_HYBRID_CANDIDATE_MULTIPLIER",
+        "RAG_DOCUMENT_HINT_MODE",
+        "RAG_STRICT_GROUNDING",
+    }
+    legacy_environment = "\n".join(
+        line
+        for line in environment_lines
+        if line.partition("=")[0] not in new_option_names
+    )
+    env_file = tmp_path / ".env"
+    env_file.write_text(legacy_environment, encoding="utf-8")
+
+    application_settings = load_settings(env_file)
+
+    assert application_settings.RAG_RETRIEVAL_MODE == "embedding"
+    assert application_settings.RAG_RRF_K == 60
+    assert application_settings.RAG_HYBRID_CANDIDATE_MULTIPLIER == 4
+    assert application_settings.RAG_DOCUMENT_HINT_MODE == "none"
+    assert application_settings.RAG_STRICT_GROUNDING is False
 
 
 def test_load_settings_requires_openai_key_when_requested(
@@ -97,7 +131,8 @@ def test_api_supports_document_editing_and_rag_requests(
         markdown_path=str(markdown_path),
         media_type="text/markdown",
         size_bytes=markdown_path.stat().st_size,
-        status="ready",
+        status="indexed",
+        chunking_strategy="hierarchical",
     )
     save_document(engine, document)
 
@@ -142,17 +177,38 @@ def test_api_supports_document_editing_and_rag_requests(
         markdown_response = client.get(
             f"/api/v1/documents/{document_id}/markdown",
         )
+        answer_response = client.post(
+            f"/api/v1/documents/{document_id}/ask",
+            json={
+                "question": "What protects the eyes?",
+                "strategy": "hierarchical",
+            },
+        )
+        option_answer_response = client.post(
+            f"/api/v1/documents/{document_id}/ask",
+            json={
+                "question": "What protects the eyes?",
+                "strategy": "hierarchical",
+                "retrieval_mode": "hybrid",
+                "top_k": 10,
+                "document_hint_mode": "boost",
+                "strict_grounding": True,
+            },
+        )
         edit_response = client.put(
             f"/api/v1/documents/{document_id}/markdown",
             json={"markdown": "# Revised safety\n"},
         )
+        stale_answer_response = client.post(
+            f"/api/v1/documents/{document_id}/ask",
+            json={
+                "question": "What protects the eyes?",
+                "strategy": "hierarchical",
+            },
+        )
         rag_response = client.post(
             f"/api/v1/documents/{document_id}/rag",
             json={"strategy": "hierarchical"},
-        )
-        answer_response = client.post(
-            f"/api/v1/documents/{document_id}/ask",
-            json={"question": "What protects the eyes?"},
         )
         upload_response = client.post(
             "/api/v1/documents",
@@ -164,8 +220,21 @@ def test_api_supports_document_editing_and_rag_requests(
     assert documents_response.json()[0]["id"] == document_id
     assert markdown_response.json()["markdown"].startswith("# Safety")
     assert edit_response.json()["status"] == "ready"
+    assert stale_answer_response.status_code == 409
     assert rag_response.json()["chunk_count"] == 2
     assert rag_response.json()["strategy"] == "hierarchical"
     assert answer_response.json()["model"] == "gpt-4.1-mini"
+    assert option_answer_response.status_code == 200
+    assert answer_mock.call_args_list[0].args[-1] == "hierarchical"
+    assert answer_mock.call_args_list[0].kwargs == {}
+    assert answer_mock.call_args_list[1].kwargs == {
+        "retrieval_mode": "hybrid",
+        "top_k": 10,
+        "document_hint_mode": "boost",
+        "strict_grounding": True,
+    }
+    application.state.collection.delete.assert_called_once_with(
+        where={"document_id": document_id},
+    )
     assert upload_response.status_code == 202
     process_mock.assert_called_once()

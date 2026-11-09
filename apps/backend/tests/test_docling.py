@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 from docling.datamodel.base_models import ConversionStatus, InputFormat
@@ -79,6 +79,41 @@ def test_parser_returns_markdown_and_partial_warnings() -> None:
         max_file_size=1024,
         max_num_pages=10,
     )
+
+
+def test_parser_marks_exact_physical_pages() -> None:
+    """Paginated extraction should retain Docling's physical page numbers."""
+
+    sample_path = Path(__file__).parent / "samples" / "sample.md"
+    parsed_document = MagicMock()
+    parsed_document.pages = {1: object(), 3: object()}
+    parsed_document.export_to_markdown.side_effect = lambda *, page_no: {
+        1: "# First page\n",
+        3: "Third page\n",
+    }[page_no]
+    conversion_result = SimpleNamespace(
+        status=ConversionStatus.SUCCESS,
+        document=parsed_document,
+        errors=[],
+    )
+    converter = MagicMock(spec=DocumentConverter)
+    converter.convert.return_value = conversion_result
+
+    markdown, _, _ = extract_markdown(
+        converter,
+        sample_path,
+        max_file_size_bytes=1024,
+        max_pages=10,
+    )
+
+    assert markdown == (
+        "<!-- docling-page: 1 -->\n\n# First page\n\n"
+        "<!-- docling-page: 3 -->\n\nThird page"
+    )
+    assert parsed_document.export_to_markdown.call_args_list == [
+        call(page_no=1),
+        call(page_no=3),
+    ]
 
 
 def test_parser_rejects_failed_conversion() -> None:

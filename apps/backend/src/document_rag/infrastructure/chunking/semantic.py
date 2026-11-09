@@ -7,9 +7,11 @@ from markdown_it import MarkdownIt
 
 from document_rag.infrastructure.token_encoding import get_token_encoding
 
+PAGE_MARKER_PATTERN = re.compile(r"<!--\s*docling-page:\s*(\d+)\s*-->")
 
-def semantic_units(markdown: str) -> list[str]:
-    """Split Markdown into intact structural blocks for embedding."""
+
+def _plain_semantic_units(markdown: str) -> list[str]:
+    """Split one marker-free Markdown segment into structural blocks."""
 
     if not markdown.strip():
         return []
@@ -48,17 +50,51 @@ def semantic_units(markdown: str) -> list[str]:
     return units
 
 
+def semantic_units_with_pages(markdown: str) -> tuple[list[str], list[list[int]]]:
+    """Return structural blocks aligned with their physical page numbers."""
+
+    if not markdown.strip():
+        return [], []
+
+    parts = PAGE_MARKER_PATTERN.split(markdown)
+    units: list[str] = []
+    unit_page_numbers: list[list[int]] = []
+    current_page = 1
+
+    prefix_units = _plain_semantic_units(parts[0])
+    units.extend(prefix_units)
+    unit_page_numbers.extend([[current_page] for _ in prefix_units])
+
+    for index in range(1, len(parts), 2):
+        current_page = int(parts[index])
+        page_units = _plain_semantic_units(parts[index + 1])
+        units.extend(page_units)
+        unit_page_numbers.extend([[current_page] for _ in page_units])
+
+    return units, unit_page_numbers
+
+
+def semantic_units(markdown: str) -> list[str]:
+    """Split Markdown into intact structural blocks for embedding."""
+
+    units, _ = semantic_units_with_pages(markdown)
+    return units
+
+
 def chunk_semantically(
     units: list[str],
     embeddings: list[list[float]],
     break_percentile: int,
     min_tokens: int,
     max_tokens: int,
+    unit_page_numbers: list[list[int]] | None = None,
 ) -> list[dict[str, object]]:
     """Group embedded blocks at semantic and structural boundaries."""
 
     if len(units) != len(embeddings):
         raise ValueError("Each semantic unit requires one embedding")
+    if unit_page_numbers is not None and len(units) != len(unit_page_numbers):
+        raise ValueError("Each semantic unit requires aligned page metadata")
     if not units:
         return []
     if not 1 <= break_percentile <= 99:
@@ -120,24 +156,30 @@ def chunk_semantically(
     current_units: list[str] = []
     current_tokens = 0
     current_heading_path = ""
+    current_pages: set[int] = set()
+
+    def append_current_chunk() -> None:
+        chunk: dict[str, object] = {
+            "text": "\n\n".join(current_units),
+            "ordinal": len(chunks),
+            "token_count": current_tokens,
+            "kind": "semantic",
+            "level": 0,
+            "parent_id": None,
+            "heading_path": current_heading_path,
+        }
+        if unit_page_numbers is not None:
+            chunk["page_numbers"] = sorted(current_pages)
+        chunks.append(chunk)
 
     for index, unit in enumerate(units):
         unit_tokens = unit_token_counts[index]
 
         if current_units and current_tokens + unit_tokens > max_tokens:
-            chunks.append(
-                {
-                    "text": "\n\n".join(current_units),
-                    "ordinal": len(chunks),
-                    "token_count": current_tokens,
-                    "kind": "semantic",
-                    "level": 0,
-                    "parent_id": None,
-                    "heading_path": current_heading_path,
-                },
-            )
+            append_current_chunk()
             current_units = []
             current_tokens = 0
+            current_pages = set()
 
         heading_match = heading_pattern.match(unit.splitlines()[0])
         if heading_match:
@@ -156,6 +198,8 @@ def chunk_semantically(
 
         current_units.append(unit)
         current_tokens += unit_tokens
+        if unit_page_numbers is not None:
+            current_pages.update(int(page) for page in unit_page_numbers[index])
         next_unit_is_heading = index + 1 < len(units) and bool(
             heading_pattern.match(units[index + 1].splitlines()[0]),
         )
@@ -167,31 +211,12 @@ def chunk_semantically(
         )
 
         if should_finish:
-            chunks.append(
-                {
-                    "text": "\n\n".join(current_units),
-                    "ordinal": len(chunks),
-                    "token_count": current_tokens,
-                    "kind": "semantic",
-                    "level": 0,
-                    "parent_id": None,
-                    "heading_path": current_heading_path,
-                },
-            )
+            append_current_chunk()
             current_units = []
             current_tokens = 0
+            current_pages = set()
 
     if current_units:
-        chunks.append(
-            {
-                "text": "\n\n".join(current_units),
-                "ordinal": len(chunks),
-                "token_count": current_tokens,
-                "kind": "semantic",
-                "level": 0,
-                "parent_id": None,
-                "heading_path": current_heading_path,
-            },
-        )
+        append_current_chunk()
 
     return chunks
