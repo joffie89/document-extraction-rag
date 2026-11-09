@@ -382,9 +382,7 @@ def _match_document_hint(
             if alias.strip()
         ]
         filename = source_file.replace("\\", "/").rsplit("/", maxsplit=1)[-1]
-        filename_alias = " ".join(
-            re.sub(r"[_-]+", " ", Path(filename).stem).split()
-        )
+        filename_alias = " ".join(re.sub(r"[_-]+", " ", Path(filename).stem).split())
         names = list(dict.fromkeys([title, *aliases, filename_alias]))
         best = None
         for name in names:
@@ -580,8 +578,7 @@ def _rank_bm25_chunks(
             document_frequency = document_frequencies[term]
             inverse_document_frequency = math.log(
                 1
-                + (corpus_size - document_frequency + 0.5)
-                / (document_frequency + 0.5)
+                + (corpus_size - document_frequency + 0.5) / (document_frequency + 0.5)
             )
             length_normalization = _BM25_K1 * (
                 1 - _BM25_B + _BM25_B * document_length / average_length
