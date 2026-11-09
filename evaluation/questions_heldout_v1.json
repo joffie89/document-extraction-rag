@@ -1,0 +1,183 @@
+[
+  {
+    "id": "h001",
+    "question": "What share of initial cryptoasset registrations were rejected, withdrawn or refused in 2023-24?",
+    "expected_answer": "86%.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 16, Chapter 2, FCA gatekeeping",
+    "type": "numeric",
+    "verified": true
+  },
+  {
+    "id": "h002",
+    "question": "How many applications for AML/CTF supervision did the FCA receive in 2023-24, and how many did it approve?",
+    "expected_answer": "275 applications received and 154 approved (6 cryptoasset firms and 148 other firms).",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 16, paragraph 2.14",
+    "type": "multi-part",
+    "verified": true
+  },
+  {
+    "id": "h003",
+    "question": "What did the Gambling Commission find about compliance among firms subject to a desk-based review or onsite visit in 2023-24?",
+    "expected_answer": "50% compliant, 25% generally compliant and 25% non-compliant.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 36, paragraph 3.20",
+    "type": "multi-part",
+    "verified": true
+  },
+  {
+    "id": "h004",
+    "question": "How many Mass Market Interventions did HMRC undertake in 2023-24?",
+    "expected_answer": "996 Mass Market Interventions.",
+    "source_file": "aml_ctf_supervision_report_2023_24.pdf",
+    "page_or_section": "PDF page 40, paragraph 3.30",
+    "type": "numeric",
+    "verified": true
+  },
+  {
+    "id": "h005",
+    "question": "What results does Economic Crime Plan 2 attribute to the JMLIT+ public-private partnership model since 2015?",
+    "expected_answer": "1,000 requests from law enforcement, contributing to over 300 arrests and the identification, seizure or restraint of over £146 million.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "PDF page 41, paragraph 2.34",
+    "type": "multi-part",
+    "verified": true
+  },
+  {
+    "id": "h006",
+    "question": "What share of all crime experienced by adults in England and Wales did fraud account for in the year ending September 2022, according to Economic Crime Plan 2?",
+    "expected_answer": "An estimated 41%.",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "PDF page 56, paragraph 4.1",
+    "type": "numeric",
+    "verified": true
+  },
+  {
+    "id": "h007",
+    "question": "According to the 2020 Economic Crime Survey cited in Economic Crime Plan 2, what share of businesses in the surveyed sectors had been a victim of fraud in the previous three years?",
+    "expected_answer": "Around one in five (18%).",
+    "source_file": "economic_crime_plan_2_2023_2026.pdf",
+    "page_or_section": "PDF page 56, paragraphs 4.1-4.2",
+    "type": "numeric",
+    "verified": true
+  },
+  {
+    "id": "h008",
+    "question": "What share of money lost to in-scope APP fraud was reimbursed in the first year of mandatory reimbursement?",
+    "expected_answer": "88% (£173 million).",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "PDF page 28, paragraph 61",
+    "type": "numeric",
+    "verified": true
+  },
+  {
+    "id": "h009",
+    "question": "How much was stolen through fraud in the first half of 2025, and how much of that was unauthorised fraud?",
+    "expected_answer": "At least £629.3 million, of which £371.8 million was unauthorised fraud.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "PDF page 28, paragraph 62",
+    "type": "multi-part",
+    "verified": true
+  },
+  {
+    "id": "h010",
+    "question": "What shares of reported APP fraud cases in 2023 involved social media, messaging and call platforms; auction, purchase and listing platforms; and telecommunications platforms?",
+    "expected_answer": "53%, 13% and 12% respectively.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "PDF page 15, paragraph 25",
+    "type": "multi-part",
+    "verified": true
+  },
+  {
+    "id": "h011",
+    "question": "According to the Fraud Strategy, what fines can Ofcom impose where it finds non-compliance with the Act's duties, such as the fraudulent advertising duties?",
+    "expected_answer": "Up to £18 million or 10% of qualifying worldwide revenue, whichever is greater.",
+    "source_file": "fraud_strategy_2026_2029.pdf",
+    "page_or_section": "PDF page 25",
+    "type": "factual",
+    "verified": true
+  },
+  {
+    "id": "h012",
+    "question": "How did the 2025 NRA's money-laundering risk rating for the casino sector change?",
+    "expected_answer": "It increased from low to medium.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "PDF page 107, paragraph 5.154",
+    "type": "factual",
+    "verified": true
+  },
+  {
+    "id": "h013",
+    "question": "How did the 2025 NRA's money-laundering risk rating for the regulated e-money and payment services sector change?",
+    "expected_answer": "It increased from medium to high.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "PDF page 82, paragraph 5.64",
+    "type": "factual",
+    "verified": true
+  },
+  {
+    "id": "h014",
+    "question": "What money-laundering risk rating did the 2025 NRA give accountancy service providers?",
+    "expected_answer": "High (it remains high).",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "PDF page 122, paragraph 5.208",
+    "type": "factual",
+    "verified": true
+  },
+  {
+    "id": "h015",
+    "question": "How many incidents of computer misuse did individuals experience in the year ending December 2024, and how did that compare with the previous year?",
+    "expected_answer": "757,000 incidents, a 23% decrease on the prior year.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "PDF page 24, cyber crime section",
+    "type": "multi-part",
+    "verified": true
+  },
+  {
+    "id": "h016",
+    "question": "What money-laundering risk rating did the 2025 NRA give the non-profit organisation sector, and how had it changed?",
+    "expected_answer": "Low, though the risk was judged to have risen within the low banding.",
+    "source_file": "national_risk_assessment_ml_tf_2025.pdf",
+    "page_or_section": "PDF page 113, paragraph 5.177",
+    "type": "factual",
+    "verified": true
+  },
+  {
+    "id": "h017",
+    "question": "What fine did the FCA impose on Starling Bank for financial crime control failings?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents",
+    "verified": true
+  },
+  {
+    "id": "h018",
+    "question": "How much APP fraud did Monzo reimburse to its customers in 2025?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents",
+    "verified": true
+  },
+  {
+    "id": "h019",
+    "question": "What is the maximum amount reimbursed per claim under the mandatory APP fraud reimbursement scheme?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents",
+    "verified": true,
+    "note": "Near-miss trap: the reimbursement scheme is discussed but no per-claim limit is given."
+  },
+  {
+    "id": "h020",
+    "question": "What was the total UK loss to APP fraud for the full calendar year 2026?",
+    "expected_answer": "The documents do not cover this.",
+    "source_file": null,
+    "page_or_section": null,
+    "type": "not-in-documents",
+    "verified": true
+  }
+]
