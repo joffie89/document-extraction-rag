@@ -87,10 +87,7 @@ def _table_cell(value: object) -> str:
 
 
 def _label_breakdown(summary: dict[str, object]) -> str:
-    return (
-        f"{summary['correct']}/{summary['partially_correct']}/"
-        f"{summary['incorrect']}"
-    )
+    return f"{summary['correct']}/{summary['partially_correct']}/{summary['incorrect']}"
 
 
 def _not_in_documents_breakdown(
@@ -101,10 +98,7 @@ def _not_in_documents_breakdown(
         for result in results
         if result["type"] == "not-in-documents"
     )
-    return (
-        f"{labels['correct']}/{labels['partially correct']}/"
-        f"{labels['incorrect']}"
-    )
+    return f"{labels['correct']}/{labels['partially correct']}/{labels['incorrect']}"
 
 
 def _answerable_refusal_ids(results: list[dict[str, object]]) -> list[str]:

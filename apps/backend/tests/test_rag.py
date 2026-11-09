@@ -496,9 +496,10 @@ def test_bm25_ties_use_stable_chunk_ids() -> None:
         {"id": "chunk-a", "text": "shared keyword"},
     ]
 
-    assert [
-        chunk["id"] for chunk in _rank_bm25_chunks("keyword", chunks)
-    ] == ["chunk-a", "chunk-z"]
+    assert [chunk["id"] for chunk in _rank_bm25_chunks("keyword", chunks)] == [
+        "chunk-a",
+        "chunk-z",
+    ]
 
 
 def test_document_hint_can_boost_a_generic_metadata_title(tmp_path: Path) -> None:
@@ -770,9 +771,7 @@ def test_rag_workflow_indexes_and_answers_without_live_api(tmp_path: Path) -> No
     assert result["answer"] == "Wear safety glasses [Source 1]."
     assert result["sources"]
     assert all(chunk["source_file"] == "sample.md" for chunk in chunks)
-    assert all(
-        chunk["document_title"] == "Workplace Safety Guide" for chunk in chunks
-    )
+    assert all(chunk["document_title"] == "Workplace Safety Guide" for chunk in chunks)
     assert all(
         chunk["document_aliases"] == "Workplace Safety Guide\nsample\nWSG"
         for chunk in chunks

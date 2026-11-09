@@ -38,12 +38,8 @@ def _result(
             "references": [],
             "all_exist": True,
             "target_applicable": expected_source_file is not None,
-            "all_match_expected": (
-                True if expected_source_file is not None else None
-            ),
-            "any_match_expected": (
-                True if expected_source_file is not None else None
-            ),
+            "all_match_expected": (True if expected_source_file is not None else None),
+            "any_match_expected": (True if expected_source_file is not None else None),
         },
         "latency_seconds": {
             "retrieval": 0.1,

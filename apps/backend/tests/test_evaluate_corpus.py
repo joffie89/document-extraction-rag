@@ -54,8 +54,7 @@ def fake_client(
     [
         ("PDF page 15, Table 2.B", {15}),
         (
-            "PDF pages 14-15, Table 2.B "
-            "(heading and figures split across pages)",
+            "PDF pages 14-15, Table 2.B (heading and figures split across pages)",
             {14, 15},
         ),
         (
@@ -407,12 +406,15 @@ def test_strategy_evaluation_with_fakes_and_report(tmp_path) -> None:
         },
         {"rank": 2, "source_file": "other.pdf", "page_numbers": [3]},
     ]
-    assert evaluate_corpus.citation_score(
-        results[0]["answer"],
-        results[0]["answer_sources"],
-        "safety.pdf",
-        {7},
-    ) == results[0]["citations"]
+    assert (
+        evaluate_corpus.citation_score(
+            results[0]["answer"],
+            results[0]["answer_sources"],
+            "safety.pdf",
+            {7},
+        )
+        == results[0]["citations"]
+    )
     assert results[0]["citations"]["all_match_expected"] is True
     assert results[0]["citations"]["any_match_expected"] is True
     assert summary["correct_rate"] == 1

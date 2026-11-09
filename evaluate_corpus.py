@@ -521,9 +521,7 @@ def judge_answer(
     """Use a deterministic structured-output judge for semantic correctness."""
 
     expected_source = str(question.get("source_file") or "").strip()
-    answerable = (
-        bool(expected_source) and question.get("type") != "not-in-documents"
-    )
+    answerable = bool(expected_source) and question.get("type") != "not-in-documents"
     if answerable and any(
         pattern.search(answer) for pattern in ANSWERABLE_REFUSAL_PATTERNS
     ):
@@ -1050,8 +1048,7 @@ def summarize_results(results: list[dict[str, object]]) -> dict[str, object]:
         ),
         "not_in_documents_questions": len(not_in_documents_results),
         "not_in_documents_correct": sum(
-            result["judge"]["label"] == "correct"
-            for result in not_in_documents_results
+            result["judge"]["label"] == "correct" for result in not_in_documents_results
         ),
         "not_in_documents_correct_rate": (
             sum(
