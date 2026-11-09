@@ -47,6 +47,10 @@ class QuestionRequest(BaseModel):
 
     question: str = Field(min_length=1, max_length=2000)
     strategy: Literal["semantic", "hierarchical"] | None = None
+    retrieval_mode: Literal["embedding", "hybrid"] | None = None
+    top_k: int | None = Field(default=None, ge=1, le=50)
+    document_hint_mode: Literal["none", "boost", "filter"] | None = None
+    strict_grounding: bool | None = None
 
 
 class RagAnswerResponse(BaseModel):

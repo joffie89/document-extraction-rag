@@ -13,7 +13,10 @@ from document_rag.application.rag_operations import (
 )
 from document_rag.core.models import DocumentRecord
 from document_rag.infrastructure.chroma_store import (
+    _has_document_like_acronym_context,
+    _rank_bm25_chunks,
     prepare_collection,
+    query_collection_chunks,
     query_document_chunks,
     replace_document_chunks,
 )
@@ -82,7 +85,30 @@ def test_generate_grounded_answer_supplies_numbered_sources() -> None:
     assert answer == "Wear safety glasses [Source 1]."
     assert request["model"] == "gpt-4.1-mini"
     assert "[Source 1] Safety > Equipment" in request["input"]
+    assert "Never calculate" not in request["instructions"]
     assert request["store"] is False
+
+
+def test_generate_grounded_answer_can_enable_strict_grounding() -> None:
+    """Strict grounding should prohibit derived figures and indirect citations."""
+
+    client = MagicMock()
+    client.responses.create.return_value = SimpleNamespace(
+        output_text="The exact figure is not stated [Source 1].",
+    )
+
+    generate_grounded_answer(
+        client,
+        model="gpt-4.1-mini",
+        question="What is the exact figure?",
+        retrieved_chunks=[{"text": "The source describes the topic."}],
+        strict_grounding=True,
+    )
+
+    instructions = client.responses.create.call_args.kwargs["instructions"]
+    assert "Never calculate, estimate, infer, or derive a figure" in instructions
+    assert "exact requested figure is not stated" in instructions
+    assert "directly support each sentence" in instructions
 
 
 def test_answer_sources_keep_retrieval_order_and_prompt_passages(
@@ -214,6 +240,78 @@ def test_answer_sources_deduplicate_retrieved_chunks_with_the_same_parent(
     assert "[Source 2] Section A\nExpanded passage A." in prompt
 
 
+def test_answer_question_default_path_keeps_legacy_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Absent opt-in settings should preserve the original query and prompt calls."""
+
+    query_mock = MagicMock(return_value=[{"id": "one", "text": "Direct fact."}])
+    generation_mock = MagicMock(return_value="Direct fact [Source 1].")
+    monkeypatch.setattr(rag_operations, "create_embeddings", lambda *args: [[1.0]])
+    monkeypatch.setattr(rag_operations, "query_document_chunks", query_mock)
+    monkeypatch.setattr(rag_operations, "generate_grounded_answer", generation_mock)
+    settings = SimpleNamespace(
+        EMBEDDING_MODEL="text-embedding-3-small",
+        GENERATION_MODEL="gpt-4.1-mini",
+        RAG_TOP_K=5,
+    )
+
+    answer_document_question(
+        MagicMock(),
+        MagicMock(),
+        "document",
+        "What is the fact?",
+        settings,
+        "hierarchical",
+    )
+
+    assert query_mock.call_args.args[3:] == (5, "hierarchical")
+    assert query_mock.call_args.kwargs == {}
+    assert generation_mock.call_args.kwargs == {}
+
+
+def test_answer_question_forwards_opt_in_retrieval_and_grounding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit options should reach retrieval and generation without re-indexing."""
+
+    query_mock = MagicMock(return_value=[{"id": "one", "text": "Direct fact."}])
+    generation_mock = MagicMock(return_value="Direct fact [Source 1].")
+    monkeypatch.setattr(rag_operations, "create_embeddings", lambda *args: [[1.0]])
+    monkeypatch.setattr(rag_operations, "query_document_chunks", query_mock)
+    monkeypatch.setattr(rag_operations, "generate_grounded_answer", generation_mock)
+    settings = SimpleNamespace(
+        EMBEDDING_MODEL="text-embedding-3-small",
+        GENERATION_MODEL="gpt-4.1-mini",
+        RAG_TOP_K=5,
+        RAG_RRF_K=42,
+        RAG_HYBRID_CANDIDATE_MULTIPLIER=3,
+    )
+
+    answer_document_question(
+        MagicMock(),
+        MagicMock(),
+        "document",
+        "What is the fact?",
+        settings,
+        "hierarchical",
+        retrieval_mode="hybrid",
+        top_k=10,
+        document_hint_mode="boost",
+        strict_grounding=True,
+    )
+
+    assert query_mock.call_args.args[3:] == (10, "hierarchical")
+    assert query_mock.call_args.kwargs == {
+        "query_text": "What is the fact?",
+        "retrieval_mode": "hybrid",
+        "rrf_k": 42,
+        "candidate_multiplier": 3,
+        "document_hint_mode": "boost",
+    }
+    assert generation_mock.call_args.kwargs == {"strict_grounding": True}
+
+
 def test_chroma_keeps_both_strategies_and_replaces_them_independently(
     tmp_path: Path,
 ) -> None:
@@ -337,6 +435,237 @@ def test_chroma_keeps_both_strategies_and_replaces_them_independently(
     assert collection.count() == 2
 
 
+def test_hybrid_retrieval_fuses_embedding_and_bm25_ranks(tmp_path: Path) -> None:
+    """Hybrid retrieval should promote a strong keyword match through RRF."""
+
+    collection = prepare_collection(tmp_path / "chroma", "hybrid_chunks")
+    replace_document_chunks(
+        collection,
+        document_id="maintenance-guide",
+        strategy="semantic",
+        chunks=[
+            {"id": "vector-first", "text": "General maintenance instructions."},
+            {"id": "keyword-first", "text": "Calibrate the zephyr manifold."},
+            {"id": "vector-second", "text": "Routine inspection schedule."},
+        ],
+        embeddings=[[1.0, 0.0], [0.0, 1.0], [0.8, 0.2]],
+    )
+
+    embedding_results = query_collection_chunks(
+        collection,
+        query_embedding=[1.0, 0.0],
+        result_count=1,
+    )
+    hybrid_results = query_collection_chunks(
+        collection,
+        query_embedding=[1.0, 0.0],
+        result_count=1,
+        query_text="What does the zephyr manifold require?",
+        retrieval_mode="hybrid",
+        rrf_k=60,
+        candidate_multiplier=4,
+    )
+
+    assert embedding_results[0]["id"] == "vector-first"
+    assert "retrieval_mode" not in embedding_results[0]
+    assert hybrid_results[0]["id"] == "keyword-first"
+    assert hybrid_results[0]["embedding_rank"] == 3
+    assert hybrid_results[0]["bm25_rank"] == 1
+    assert hybrid_results[0]["retrieval_mode"] == "hybrid"
+
+
+def test_hybrid_retrieval_requires_query_text(tmp_path: Path) -> None:
+    """Opting into BM25 must supply the text used for keyword ranking."""
+
+    collection = prepare_collection(tmp_path / "chroma", "hybrid_validation")
+
+    with pytest.raises(ValueError, match="requires query text"):
+        query_collection_chunks(
+            collection,
+            query_embedding=[1.0, 0.0],
+            result_count=1,
+            retrieval_mode="hybrid",
+        )
+
+
+def test_bm25_ties_use_stable_chunk_ids() -> None:
+    """Equal keyword scores should not depend on vector-store return order."""
+
+    chunks = [
+        {"id": "chunk-z", "text": "shared keyword"},
+        {"id": "chunk-a", "text": "shared keyword"},
+    ]
+
+    assert [
+        chunk["id"] for chunk in _rank_bm25_chunks("keyword", chunks)
+    ] == ["chunk-a", "chunk-z"]
+
+
+def test_document_hint_can_boost_a_generic_metadata_title(tmp_path: Path) -> None:
+    """A unique title mention should boost that document without hard-coded names."""
+
+    collection = prepare_collection(tmp_path / "chroma", "hint_chunks")
+    replace_document_chunks(
+        collection,
+        document_id="alpha",
+        strategy="hierarchical",
+        chunks=[
+            {
+                "id": "alpha:1",
+                "text": "The exact maintenance interval is stated here.",
+                "document_title": "Alpha Equipment Handbook",
+                "document_aliases": "Alpha Equipment Handbook\nAEH",
+                "source_file": "alpha_handbook.pdf",
+            },
+        ],
+        embeddings=[[0.0, 1.0]],
+    )
+    replace_document_chunks(
+        collection,
+        document_id="beta",
+        strategy="hierarchical",
+        chunks=[
+            {
+                "id": "beta:1",
+                "text": "General maintenance information.",
+                "document_title": "Beta Operations Manual",
+                "document_aliases": "Beta Operations Manual\nBOM",
+                "source_file": "beta_manual.pdf",
+            },
+        ],
+        embeddings=[[1.0, 0.0]],
+    )
+
+    baseline = query_collection_chunks(collection, [1.0, 0.0], 1)
+    hinted = query_collection_chunks(
+        collection,
+        [1.0, 0.0],
+        1,
+        query_text="According to the Alpha Equipment Handbook, what is required?",
+        document_hint_mode="boost",
+        candidate_multiplier=2,
+    )
+
+    assert baseline[0]["id"] == "beta:1"
+    assert hinted[0]["id"] == "alpha:1"
+    assert hinted[0]["document_hint_mode"] == "boost"
+    assert hinted[0]["document_hint_title"] == "Alpha Equipment Handbook"
+    assert hinted[0]["document_hint_matched_name"] == "Alpha Equipment Handbook"
+
+
+def test_document_hint_filter_uses_initialism_and_noops_without_match(
+    tmp_path: Path,
+) -> None:
+    """Initialisms should filter uniquely while unmatched hints preserve ranking."""
+
+    collection = prepare_collection(tmp_path / "chroma", "hint_filter_chunks")
+    for document_id, title, alias, embedding in (
+        ("first", "First Reference Manual", "FRM", [0.0, 1.0]),
+        ("second", "Second Reference Manual", "SRM", [1.0, 0.0]),
+    ):
+        replace_document_chunks(
+            collection,
+            document_id=document_id,
+            strategy="hierarchical",
+            chunks=[
+                {
+                    "id": f"{document_id}:1",
+                    "text": f"Material from {title}.",
+                    "document_title": title,
+                    "document_aliases": f"{title}\n{alias}",
+                },
+            ],
+            embeddings=[embedding],
+        )
+
+    filtered = query_collection_chunks(
+        collection,
+        [1.0, 0.0],
+        2,
+        query_text="What does the FRM require?",
+        document_hint_mode="filter",
+    )
+    unmatched = query_collection_chunks(
+        collection,
+        [1.0, 0.0],
+        1,
+        query_text="What is required?",
+        document_hint_mode="boost",
+    )
+
+    assert [chunk["document_id"] for chunk in filtered] == ["first"]
+    assert filtered[0]["document_hint_matched_name"] == "FRM"
+    assert unmatched[0]["document_id"] == "second"
+    assert "document_hint_mode" not in unmatched[0]
+
+
+@pytest.mark.parametrize(
+    "question",
+    (
+        "What does the 2025 NRA cover?",
+        "How did the previous NRA describe the issue?",
+        "What are the NRA's findings?",
+        "According to the NRA, what changed?",
+        "What did the NRA say about the change?",
+        "NRA defines the relevant measure how?",
+    ),
+)
+def test_document_acronym_context_accepts_named_source_uses(question: str) -> None:
+    """Document-like grammar should permit a single-token acronym hint."""
+
+    assert _has_document_like_acronym_context(question, "nra") is True
+
+
+@pytest.mark.parametrize(
+    "question",
+    (
+        "Which AML controls are described?",
+        "How many AML false positives occurred?",
+    ),
+)
+def test_document_acronym_context_rejects_topic_uses(question: str) -> None:
+    """An unqualified topic acronym must not be treated as a document name."""
+
+    assert _has_document_like_acronym_context(question, "aml") is False
+
+
+def test_document_hint_ignores_an_alias_shared_by_multiple_documents(
+    tmp_path: Path,
+) -> None:
+    """A generated short name must uniquely identify one document to apply."""
+
+    collection = prepare_collection(tmp_path / "chroma", "ambiguous_hint_chunks")
+    for document_id, title, embedding in (
+        ("first", "Service Reliability Guide", [0.0, 1.0]),
+        ("second", "Systems Reference Guide", [1.0, 0.0]),
+    ):
+        replace_document_chunks(
+            collection,
+            document_id=document_id,
+            strategy="hierarchical",
+            chunks=[
+                {
+                    "id": f"{document_id}:1",
+                    "text": f"Material from {title}.",
+                    "document_title": title,
+                    "document_aliases": f"{title}\nSRG",
+                },
+            ],
+            embeddings=[embedding],
+        )
+
+    results = query_collection_chunks(
+        collection,
+        [1.0, 0.0],
+        1,
+        query_text="What does SRG require?",
+        document_hint_mode="boost",
+    )
+
+    assert results[0]["document_id"] == "second"
+    assert "document_hint_mode" not in results[0]
+
+
 def test_rag_workflow_indexes_and_answers_without_live_api(tmp_path: Path) -> None:
     """The full RAG workflow should run with local storage and fake AI results."""
 
@@ -441,6 +770,13 @@ def test_rag_workflow_indexes_and_answers_without_live_api(tmp_path: Path) -> No
     assert result["answer"] == "Wear safety glasses [Source 1]."
     assert result["sources"]
     assert all(chunk["source_file"] == "sample.md" for chunk in chunks)
+    assert all(
+        chunk["document_title"] == "Workplace Safety Guide" for chunk in chunks
+    )
+    assert all(
+        chunk["document_aliases"] == "Workplace Safety Guide\nsample\nWSG"
+        for chunk in chunks
+    )
     assert all(chunk["page_numbers"] == [1] for chunk in chunks)
     assert result["sources"][0]["source_file"] == "sample.md"
     assert result["sources"][0]["page_numbers"] == "1"

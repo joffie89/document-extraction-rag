@@ -8,6 +8,7 @@ from openai import OpenAI
 from sqlalchemy import Engine
 
 from document_rag.application.document_operations import load_document_markdown
+from document_rag.core.document_metadata import extract_document_metadata
 from document_rag.infrastructure.chroma_store import (
     delete_document_chunks,
     query_document_chunks,
@@ -76,6 +77,7 @@ def prepare_document_for_rag(
         raise FileNotFoundError(f"Document {document_id} was not found")
 
     markdown = load_document_markdown(engine, document_id)
+    search_metadata = extract_document_metadata(document.original_name, markdown)
     document.status = "indexing"
     save_document(engine, document)
 
@@ -115,6 +117,7 @@ def prepare_document_for_rag(
         chunk_texts = []
         for chunk in chunks:
             chunk["source_file"] = document.original_name
+            chunk.update(search_metadata)
             chunk_texts.append(str(chunk["text"]))
 
         chunk_embeddings = create_embeddings(
@@ -149,32 +152,79 @@ def answer_document_question(
     question: str,
     settings: LazySettings,
     strategy: str | None = None,
+    *,
+    retrieval_mode: str | None = None,
+    top_k: int | None = None,
+    document_hint_mode: str | None = None,
+    strict_grounding: bool | None = None,
 ) -> dict[str, object]:
     """Retrieve document context, expand hierarchy, and generate an answer."""
+
+    effective_retrieval_mode = retrieval_mode or getattr(
+        settings,
+        "RAG_RETRIEVAL_MODE",
+        "embedding",
+    )
+    effective_top_k = top_k if top_k is not None else settings.RAG_TOP_K
+    effective_hint_mode = document_hint_mode or getattr(
+        settings,
+        "RAG_DOCUMENT_HINT_MODE",
+        "none",
+    )
+    effective_strict_grounding = (
+        strict_grounding
+        if strict_grounding is not None
+        else bool(getattr(settings, "RAG_STRICT_GROUNDING", False))
+    )
 
     query_embeddings = create_embeddings(
         openai_client,
         [question],
         settings.EMBEDDING_MODEL,
     )
-    retrieved_chunks = query_document_chunks(
-        collection,
-        document_id,
-        query_embeddings[0],
-        settings.RAG_TOP_K,
-        strategy,
-    )
+    if effective_retrieval_mode == "embedding" and effective_hint_mode == "none":
+        retrieved_chunks = query_document_chunks(
+            collection,
+            document_id,
+            query_embeddings[0],
+            effective_top_k,
+            strategy,
+        )
+    else:
+        retrieved_chunks = query_document_chunks(
+            collection,
+            document_id,
+            query_embeddings[0],
+            effective_top_k,
+            strategy,
+            query_text=question,
+            retrieval_mode=effective_retrieval_mode,
+            rrf_k=int(getattr(settings, "RAG_RRF_K", 60)),
+            candidate_multiplier=int(
+                getattr(settings, "RAG_HYBRID_CANDIDATE_MULTIPLIER", 4),
+            ),
+            document_hint_mode=effective_hint_mode,
+        )
     if not retrieved_chunks:
         raise LookupError("No indexed context was found for this document")
 
     citation_sources = build_answer_sources(retrieved_chunks)
 
-    answer = generate_grounded_answer(
-        openai_client,
-        settings.GENERATION_MODEL,
-        question,
-        citation_sources,
-    )
+    if effective_strict_grounding:
+        answer = generate_grounded_answer(
+            openai_client,
+            settings.GENERATION_MODEL,
+            question,
+            citation_sources,
+            strict_grounding=True,
+        )
+    else:
+        answer = generate_grounded_answer(
+            openai_client,
+            settings.GENERATION_MODEL,
+            question,
+            citation_sources,
+        )
 
     return {
         "answer": answer,

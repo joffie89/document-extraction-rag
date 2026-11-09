@@ -49,6 +49,19 @@ def load_settings(
         Validator("MIN_CHUNK_TOKENS", gte=1),
         Validator("MAX_CHUNK_TOKENS", gte=1),
         Validator("RAG_TOP_K", gte=1),
+        Validator(
+            "RAG_RETRIEVAL_MODE",
+            default="embedding",
+            is_in=("embedding", "hybrid"),
+        ),
+        Validator("RAG_RRF_K", default=60, gte=1),
+        Validator("RAG_HYBRID_CANDIDATE_MULTIPLIER", default=4, gte=1),
+        Validator(
+            "RAG_DOCUMENT_HINT_MODE",
+            default="none",
+            is_in=("none", "boost", "filter"),
+        ),
+        Validator("RAG_STRICT_GROUNDING", default=False, is_type_of=bool),
         Validator("LOG_LEVEL", is_in=("DEBUG", "INFO", "WARNING", "ERROR")),
     ]
 

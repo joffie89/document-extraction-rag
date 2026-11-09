@@ -17,4 +17,5 @@ data/corpus/*
 apps/web/node_modules/
 apps/web/dist/
 evaluation/.runtime_v1/
+evaluation/.runtime_v2/
 .DS_Store

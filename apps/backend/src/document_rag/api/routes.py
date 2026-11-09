@@ -229,6 +229,16 @@ def ask_document(
         )
 
     try:
+        optional_arguments = {
+            name: value
+            for name, value in {
+                "retrieval_mode": payload.retrieval_mode,
+                "top_k": payload.top_k,
+                "document_hint_mode": payload.document_hint_mode,
+                "strict_grounding": payload.strict_grounding,
+            }.items()
+            if value is not None
+        }
         result = answer_document_question(
             request.app.state.collection,
             request.app.state.openai_client,
@@ -236,6 +246,7 @@ def ask_document(
             payload.question,
             request.app.state.settings,
             strategy,
+            **optional_arguments,
         )
     except LookupError as exc:
         raise HTTPException(

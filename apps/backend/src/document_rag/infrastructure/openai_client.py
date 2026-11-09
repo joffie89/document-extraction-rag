@@ -40,6 +40,7 @@ def generate_grounded_answer(
     retrieved_chunks: list[dict[str, object]],
     *,
     temperature: float = 0.2,
+    strict_grounding: bool = False,
 ) -> str:
     """Answer from retrieved context and require inline source references."""
 
@@ -57,12 +58,22 @@ def generate_grounded_answer(
         )
 
     context = "\n\n".join(context_blocks)
+    instructions = (
+        "Answer only from the supplied sources. Cite supporting statements "
+        "with [Source N]. If the sources do not contain the answer, say so."
+    )
+    if strict_grounding:
+        instructions += (
+            " Never calculate, estimate, infer, or derive a figure that is not "
+            "explicitly stated in the sources. If the exact requested figure is "
+            "not stated, say that the sources do not state it. Cite only sources "
+            "that directly support each sentence, placing the citation in that "
+            "sentence."
+        )
+
     response = client.responses.create(
         model=model,
-        instructions=(
-            "Answer only from the supplied sources. Cite supporting statements "
-            "with [Source N]. If the sources do not contain the answer, say so."
-        ),
+        instructions=instructions,
         input=f"Question:\n{question.strip()}\n\nSources:\n{context}",
         max_output_tokens=800,
         temperature=temperature,

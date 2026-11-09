@@ -67,6 +67,25 @@ SOURCE_CITATION_LIST_PATTERN = re.compile(
     r"(\d+(?![\d.])(?:\s*,\s*(?:Sources?\s+)?\d+(?![\d.]))*)",
     re.IGNORECASE,
 )
+ANSWERABLE_REFUSAL_PATTERNS = (
+    re.compile(
+        r"\b(?:sources?|documents?|reports?|plans?|strateg(?:y|ies)|"
+        r"assessments?|excerpts?|context|material)\b.{0,100}"
+        r"\b(?:do(?:es)?\s+not|don['’]t|doesn['’]t|cannot|can['’]t)\s+"
+        r"(?:(?:explicitly|directly|specifically)\s+)?"
+        r"(?:contain|specify|provide|define|state|detail|give|include|mention|cover)\b",
+        re.IGNORECASE | re.DOTALL,
+    ),
+    re.compile(
+        r"\b(?:is|are|was|were)\s+not\s+"
+        r"(?:(?:explicitly|directly|specifically)\s+)?"
+        r"(?:contained|specified|provided|defined|stated|detailed|given|"
+        r"included|mentioned|covered|available)\b.{0,100}"
+        r"\b(?:sources?|documents?|reports?|plans?|strateg(?:y|ies)|"
+        r"assessments?|excerpts?|context|material)\b",
+        re.IGNORECASE | re.DOTALL,
+    ),
+)
 JUDGE_LABELS = {"correct", "partially correct", "incorrect"}
 
 
@@ -459,8 +478,12 @@ def citation_score(
     )
     target_applicable = expected_source_file is not None
     all_match = None
+    any_match = None
     if target_applicable:
         all_match = bool(references) and all(
+            bool(reference["matches_expected"]) for reference in references
+        )
+        any_match = bool(references) and any(
             bool(reference["matches_expected"]) for reference in references
         )
     return {
@@ -468,6 +491,7 @@ def citation_score(
         "all_exist": all_exist,
         "target_applicable": target_applicable,
         "all_match_expected": all_match,
+        "any_match_expected": any_match,
     }
 
 
@@ -496,14 +520,29 @@ def judge_answer(
 ) -> dict[str, str]:
     """Use a deterministic structured-output judge for semantic correctness."""
 
+    expected_source = str(question.get("source_file") or "").strip()
+    answerable = (
+        bool(expected_source) and question.get("type") != "not-in-documents"
+    )
+    if answerable and any(
+        pattern.search(answer) for pattern in ANSWERABLE_REFUSAL_PATTERNS
+    ):
+        return {
+            "label": "incorrect",
+            "reason": "refused an answerable question",
+        }
+
     response = client.responses.create(
         model=model,
         instructions=(
             "Compare the candidate answer with the expected answer for semantic "
             "correctness. Label it correct, partially correct, or incorrect. "
-            "A correct answer contains all material facts even if phrased "
-            "differently. A partially correct answer has a material omission or "
-            "minor factual error. For a not-in-documents question, correct means "
+            "Label an answer correct only if every key fact in the expected "
+            "answer is present and accurate, even if phrased differently. "
+            "Missing or wrong numbers must be labelled partially correct or "
+            "incorrect, never correct. A partially correct answer has a material "
+            "omission or minor factual error. For a not-in-documents question, "
+            "correct means "
             "the candidate clearly says the supplied documents or sources do not "
             "contain the answer; any invented answer is incorrect. Give one brief "
             "sentence explaining the label."
@@ -551,7 +590,7 @@ def judge_answer(
 def _serialize_chunk(chunk: dict[str, object], rank: int) -> dict[str, object]:
     """Keep the raw retrieval evidence needed to audit one result."""
 
-    return {
+    serialized = {
         "rank": rank,
         "id": str(chunk.get("id") or ""),
         "text": str(chunk.get("text") or ""),
@@ -561,6 +600,22 @@ def _serialize_chunk(chunk: dict[str, object], rank: int) -> dict[str, object]:
         "heading_path": str(chunk.get("heading_path") or ""),
         "kind": str(chunk.get("kind") or ""),
     }
+    for field_name in (
+        "retrieval_mode",
+        "embedding_rank",
+        "bm25_rank",
+        "bm25_score",
+        "rrf_score",
+        "document_hint_rank",
+        "document_hint_mode",
+        "document_hint_document_id",
+        "document_hint_title",
+        "document_hint_source_file",
+        "document_hint_matched_name",
+    ):
+        if field_name in chunk:
+            serialized[field_name] = chunk[field_name]
+    return serialized
 
 
 def _serialize_answer_sources(
@@ -657,8 +712,16 @@ def index_corpus(
     runtime_directory: Path,
     settings: object,
     client: MeteredOpenAI,
+    *,
+    strategies: Sequence[str] = STRATEGIES,
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Extract through Docling and index each document into fresh collections."""
+
+    selected_strategies = tuple(strategies)
+    if not selected_strategies or any(
+        strategy not in STRATEGIES for strategy in selected_strategies
+    ):
+        raise ValueError("Evaluation strategies must be hierarchical or semantic")
 
     engine = build_database(
         f"sqlite:///{(runtime_directory / 'documents.db').as_posix()}",
@@ -672,7 +735,7 @@ def index_corpus(
             runtime_directory / "chroma" / strategy,
             f"evaluation_v1_{strategy}",
         )
-        for strategy in STRATEGIES
+        for strategy in selected_strategies
     }
     corpus_root = Path(corpus_directory).expanduser().resolve()
     documents = []
@@ -699,7 +762,7 @@ def index_corpus(
                 settings.MAX_DOCUMENT_PAGES,
             )
             chunk_counts = {}
-            for strategy in STRATEGIES:
+            for strategy in selected_strategies:
                 with client.phase(f"indexing:{strategy}"):
                     chunks = prepare_document_for_rag(
                         engine,
@@ -746,13 +809,28 @@ def evaluate_strategy(
     answer_function: Callable[..., str] = generate_grounded_answer,
     judge_function: Callable[..., dict[str, str]] = judge_answer,
     clock: Callable[[], float] = time.perf_counter,
+    top_k: int | None = None,
+    retrieval_mode: str = "embedding",
+    rrf_k: int = 60,
+    candidate_multiplier: int = 4,
+    document_hint_mode: str = "none",
+    strict_grounding: bool = False,
+    run_label: str | None = None,
 ) -> list[dict[str, object]]:
     """Run every fixture question through one collection and chunking strategy."""
 
+    effective_top_k = int(settings.RAG_TOP_K if top_k is None else top_k)
+    if effective_top_k < 1:
+        raise ValueError("Retrieval depth must be positive")
+    if retrieval_mode not in {"embedding", "hybrid"}:
+        raise ValueError("Retrieval mode must be embedding or hybrid")
+    if document_hint_mode not in {"none", "boost", "filter"}:
+        raise ValueError("Document hint mode must be none, boost, or filter")
+    phase_label = run_label or strategy
     results = []
     for position, question in enumerate(questions, start=1):
         print(
-            f"[{strategy} {position}/{len(questions)}] {question['id']}: "
+            f"[{phase_label} {position}/{len(questions)}] {question['id']}: "
             f"{question['question']}",
             flush=True,
         )
@@ -760,33 +838,48 @@ def evaluate_strategy(
         total_started = clock()
 
         retrieval_started = clock()
-        with client.phase(f"question:{strategy}:{question['id']}:retrieval"):
+        with client.phase(f"question:{phase_label}:{question['id']}:retrieval"):
             query_embedding = embedding_function(
                 client,
                 [str(question["question"])],
                 settings.EMBEDDING_MODEL,
             )[0]
-        retrieved = query_function(
-            collection,
-            query_embedding,
-            settings.RAG_TOP_K,
-        )
+        if retrieval_mode == "embedding" and document_hint_mode == "none":
+            retrieved = query_function(
+                collection,
+                query_embedding,
+                effective_top_k,
+            )
+        else:
+            retrieved = query_function(
+                collection,
+                query_embedding,
+                effective_top_k,
+                query_text=str(question["question"]),
+                retrieval_mode=retrieval_mode,
+                rrf_k=rrf_k,
+                candidate_multiplier=candidate_multiplier,
+                document_hint_mode=document_hint_mode,
+            )
         retrieval_latency = clock() - retrieval_started
         answer_sources = answer_source_function(retrieved)
 
         answer_started = clock()
-        with client.phase(f"question:{strategy}:{question['id']}:answer"):
+        with client.phase(f"question:{phase_label}:{question['id']}:answer"):
+            answer_arguments: dict[str, object] = {"temperature": 0}
+            if strict_grounding:
+                answer_arguments["strict_grounding"] = True
             answer = answer_function(
                 client,
                 settings.GENERATION_MODEL,
                 str(question["question"]),
                 answer_sources,
-                temperature=0,
+                **answer_arguments,
             )
         answer_latency = clock() - answer_started
 
         judge_started = clock()
-        with client.phase(f"question:{strategy}:{question['id']}:judge"):
+        with client.phase(f"question:{phase_label}:{question['id']}:judge"):
             judgment = judge_function(
                 client,
                 question,
@@ -811,6 +904,39 @@ def evaluate_strategy(
             _serialize_chunk(chunk, rank)
             for rank, chunk in enumerate(retrieved, start=1)
         ]
+        if document_hint_mode != "none":
+            hinted_chunk = next(
+                (
+                    chunk
+                    for chunk in retrieved
+                    if chunk.get("document_hint_document_id") is not None
+                ),
+                None,
+            )
+            retrieval["document_hint"] = {
+                "mode": document_hint_mode,
+                "applied": hinted_chunk is not None,
+                "matched_document_id": (
+                    hinted_chunk.get("document_hint_document_id")
+                    if hinted_chunk is not None
+                    else None
+                ),
+                "matched_title": (
+                    hinted_chunk.get("document_hint_title")
+                    if hinted_chunk is not None
+                    else None
+                ),
+                "matched_source_file": (
+                    hinted_chunk.get("document_hint_source_file")
+                    if hinted_chunk is not None
+                    else None
+                ),
+                "matched_name": (
+                    hinted_chunk.get("document_hint_matched_name")
+                    if hinted_chunk is not None
+                    else None
+                ),
+            }
         citations = citation_score(
             answer,
             answer_sources,
@@ -853,6 +979,12 @@ def summarize_results(results: list[dict[str, object]]) -> dict[str, object]:
     citation_results = [
         result for result in results if bool(result["citations"]["target_applicable"])
     ]
+    answerable_results = [
+        result for result in results if result.get("expected_source_file") is not None
+    ]
+    not_in_documents_results = [
+        result for result in results if result.get("type") == "not-in-documents"
+    ]
     hit_ranks = [
         int(result["retrieval"]["first_hit_rank"])
         for result in retrieval_results
@@ -888,6 +1020,46 @@ def summarize_results(results: list[dict[str, object]]) -> dict[str, object]:
             )
             / len(citation_results)
             if citation_results
+            else None
+        ),
+        "citation_any_correct": sum(
+            result["citations"]["any_match_expected"] is True
+            for result in citation_results
+        ),
+        "citation_any_correct_rate": (
+            sum(
+                result["citations"]["any_match_expected"] is True
+                for result in citation_results
+            )
+            / len(citation_results)
+            if citation_results
+            else None
+        ),
+        "answerable_refusals": sum(
+            result["judge"]["reason"] == "refused an answerable question"
+            for result in answerable_results
+        ),
+        "answerable_refusal_rate": (
+            sum(
+                result["judge"]["reason"] == "refused an answerable question"
+                for result in answerable_results
+            )
+            / len(answerable_results)
+            if answerable_results
+            else None
+        ),
+        "not_in_documents_questions": len(not_in_documents_results),
+        "not_in_documents_correct": sum(
+            result["judge"]["label"] == "correct"
+            for result in not_in_documents_results
+        ),
+        "not_in_documents_correct_rate": (
+            sum(
+                result["judge"]["label"] == "correct"
+                for result in not_in_documents_results
+            )
+            / len(not_in_documents_results)
+            if not_in_documents_results
             else None
         ),
         "mean_latency_seconds": (

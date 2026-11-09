@@ -177,6 +177,7 @@ def test_citation_scoring_checks_every_reference_and_target() -> None:
     assert inaccurate["references"][1]["exists"] is False
     assert [reference["number"] for reference in grouped["references"]] == [1, 2]
     assert grouped["all_match_expected"] is False
+    assert grouped["any_match_expected"] is True
 
 
 @pytest.mark.parametrize(
@@ -267,6 +268,44 @@ def test_judge_uses_structured_output_and_not_in_documents_rubric() -> None:
     assert request["model"] == "gpt-4.1-mini"
     assert request["text"]["format"]["type"] == "json_schema"
     assert "any invented answer is incorrect" in request["instructions"]
+    assert "correct only if every key fact" in request["instructions"]
+    assert "Missing or wrong numbers" in request["instructions"]
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "The sources provided do not contain information on this topic.",
+        "The provided sources do not specify the requested figure.",
+        "These documents don't provide the answer.",
+        "The supplied documents do not define that term.",
+        "The information is not specified in the provided sources.",
+        "The Economic Crime Plan does not provide a direct definition.",
+        "The exact rating is not explicitly stated in the provided excerpts.",
+        "The requested figure is not available from the supplied report.",
+    ],
+)
+def test_judge_rejects_answerable_refusal_without_llm_call(answer: str) -> None:
+    """A sourced question cannot receive credit for refusing to answer."""
+
+    raw_client = fake_client()
+    metered = evaluate_corpus.MeteredOpenAI(raw_client)
+    question = {
+        "id": "q998",
+        "type": "factual",
+        "question": "What figure is reported?",
+        "expected_answer": "The reported figure is 42.",
+        "source_file": "report.pdf",
+    }
+
+    judgment = evaluate_corpus.judge_answer(metered, question, answer)
+
+    assert judgment == {
+        "label": "incorrect",
+        "reason": "refused an answerable question",
+    }
+    assert raw_client.responses.calls == []
+    assert metered.records == []
 
 
 def test_strategy_evaluation_with_fakes_and_report(tmp_path) -> None:
@@ -375,10 +414,100 @@ def test_strategy_evaluation_with_fakes_and_report(tmp_path) -> None:
         {7},
     ) == results[0]["citations"]
     assert results[0]["citations"]["all_match_expected"] is True
+    assert results[0]["citations"]["any_match_expected"] is True
     assert summary["correct_rate"] == 1
+    assert summary["citation_any_correct_rate"] == 1
+    assert summary["answerable_refusals"] == 0
     assert "## Overall results" in report
     assert "## Results by question type" in report
     assert "## Not-in-documents results" in report
     assert "## Cost and latency" in report
     assert "## Wrong or partially correct answers" in report
     assert "Indexing cost (USD)" in report
+
+
+def test_strategy_evaluation_applies_opt_in_retrieval_and_grounding() -> None:
+    """V2 overrides should be explicit and auditable without changing defaults."""
+
+    question = {
+        "id": "q-opt-in",
+        "question": "What value does the named guide state?",
+        "expected_answer": "The stated value is 42.",
+        "source_file": "guide.pdf",
+        "page_or_section": "PDF page 3",
+        "type": "numeric",
+    }
+    retrieved = [
+        {
+            "id": "chunk-1",
+            "text": "The stated value is 42.",
+            "source_file": "guide.pdf",
+            "page_numbers": "3",
+            "distance": 0.02,
+            "retrieval_mode": "hybrid",
+            "embedding_rank": 2,
+            "bm25_rank": 1,
+            "rrf_score": 0.03,
+            "document_hint_document_id": "document-1",
+            "document_hint_title": "Named Guide",
+            "document_hint_source_file": "guide.pdf",
+            "document_hint_matched_name": "Named Guide",
+        },
+    ]
+    settings = SimpleNamespace(
+        EMBEDDING_MODEL="text-embedding-3-small",
+        GENERATION_MODEL="gpt-4.1-mini",
+        RAG_TOP_K=5,
+    )
+    query_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    answer_calls: list[dict[str, object]] = []
+
+    def query_function(
+        *args: object,
+        **kwargs: object,
+    ) -> list[dict[str, object]]:
+        query_calls.append((args, kwargs))
+        return retrieved
+
+    def answer_function(*args: object, **kwargs: object) -> str:
+        answer_calls.append(kwargs)
+        return "The stated value is 42 [Source 1]."
+
+    results = evaluate_corpus.evaluate_strategy(
+        "hierarchical",
+        object(),
+        [question],
+        settings,
+        evaluate_corpus.MeteredOpenAI(fake_client()),
+        embedding_function=lambda *args: [[1.0, 0.0]],
+        query_function=query_function,
+        answer_function=answer_function,
+        judge_function=lambda *args: {
+            "label": "correct",
+            "reason": "The answer includes the expected fact.",
+        },
+        top_k=10,
+        retrieval_mode="hybrid",
+        document_hint_mode="boost",
+        strict_grounding=True,
+        run_label="hybrid_k10_hint_grounded",
+    )
+
+    assert query_calls[0][0][2] == 10
+    assert query_calls[0][1] == {
+        "query_text": question["question"],
+        "retrieval_mode": "hybrid",
+        "rrf_k": 60,
+        "candidate_multiplier": 4,
+        "document_hint_mode": "boost",
+    }
+    assert answer_calls == [{"temperature": 0, "strict_grounding": True}]
+    assert results[0]["retrieval"]["document_hint"] == {
+        "mode": "boost",
+        "applied": True,
+        "matched_document_id": "document-1",
+        "matched_title": "Named Guide",
+        "matched_source_file": "guide.pdf",
+        "matched_name": "Named Guide",
+    }
+    assert results[0]["retrieval"]["chunks"][0]["bm25_rank"] == 1
